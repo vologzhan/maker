@@ -31,8 +31,11 @@ func New(tpl *template.Namespace, srcPath string) (*Node, error) {
 	return n, nil
 }
 
-func (n *Node) Id() uuid.UUID             { return n.id }
-func (n *Node) Values() map[string]string { return n.values }
+func (n *Node) Id() uuid.UUID                  { return n.id }
+func (n *Node) Parent() *Node                  { return n.parent }
+func (n *Node) Values() map[string]string      { return n.values }
+func (n *Node) ValueString(name string) string { return n.values[name] }
+func (n *Node) ValueBool(name string) bool     { return n.values[name] != "" }
 
 func (n *Node) SetValues(values map[string]string) error {
 	if err := n.readPaths(); err != nil {
@@ -55,7 +58,7 @@ func (n *Node) SetValues(values map[string]string) error {
 func (n *Node) CreateChild(nspace string, id uuid.UUID, values map[string]string) (*Node, error) {
 	tpl, ok := n.template.Children[nspace]
 	if !ok {
-		return nil, fmt.Errorf("source: Node.CreateChild: child namespace '%s' does not exist", nspace)
+		return nil, fmt.Errorf("maker: Node.CreateChild: child namespace '%s' does not exist", nspace)
 	}
 
 	if err := n.readKeys(tpl); err != nil {
@@ -66,9 +69,9 @@ func (n *Node) CreateChild(nspace string, id uuid.UUID, values map[string]string
 	n.children[tpl.Name] = append(n.children[tpl.Name], child)
 
 	for _, tplEntry := range tpl.Entrypoints {
-		srcParent := findSourceByTemplate(n, tplEntry.Parent())
-		if srcParent == nil {
-			return nil, errors.New("source: Node.CreateChild: node not found")
+		srcParent, err := findSourceByTemplate(n, tplEntry.Parent())
+		if err != nil {
+			return nil, err
 		}
 
 		srcEntry := source.CreateEntry(tplEntry, srcParent)
@@ -85,7 +88,7 @@ func (n *Node) CreateChild(nspace string, id uuid.UUID, values map[string]string
 func (n *Node) Children(nspace string) ([]*Node, error) {
 	tpl, ok := n.template.Children[nspace]
 	if !ok {
-		return nil, fmt.Errorf("source: Node.Children: child namespace '%s' does not exist", nspace)
+		return nil, fmt.Errorf("maker: Node.Children: child namespace '%s' does not exist", nspace)
 	}
 
 	if err := n.readKeys(tpl); err != nil {
@@ -153,13 +156,44 @@ func (n *Node) readPaths() error {
 	return nil
 }
 
-func findSourceByTemplate(node *Node, tpl template.Node) source.Node {
+func (n *Node) Delete() error {
+	panic("implement me") // todo
+}
+
+func findSourceByTemplate(node *Node, tpl template.Node) (source.Node, error) {
 	for _, src := range node.entrypoints {
-		if template.IsChildOrCurrent(src.GetTemplate(), tpl) {
-			return source.FindChildByTemplate(src, tpl)
+		if !template.IsChildOrCurrent(src.GetTemplate(), tpl) {
+			continue
 		}
+
+		foundNode := source.FindChildByTemplate(src, tpl)
+		if foundNode != nil {
+			return foundNode, nil
+		}
+
+		tplFs, err := template.UpToFsNode(tpl)
+		if err != nil {
+			return nil, err
+		}
+
+		isFound, err := readSourceByTemplate(node, tplFs)
+		if err != nil {
+			return nil, err
+		}
+
+		if !isFound {
+			break
+		}
+
+		foundNode = source.FindChildByTemplate(src, tpl)
+		if foundNode == nil {
+			break
+		}
+
+		return foundNode, nil
 	}
-	return nil
+
+	return nil, errors.New("maker: findSourceByTemplate: node not found")
 }
 
 func readSourceByTemplate(node *Node, tpl template.Fs) (bool, error) {
@@ -192,7 +226,7 @@ func setInserts(node *Node, src source.Node) error {
 	if ins, ok := src.(*source.Insert); ok {
 		node = node.getCurrentOrParent(ins.Template.Namespace)
 		if node == nil {
-			return fmt.Errorf("source: Node.setInserts: namespace '%s' does not exist", ins.Template.Namespace)
+			return fmt.Errorf("maker: Node.setInserts: namespace '%s' does not exist", ins.Template.Namespace)
 		}
 
 		node.inserts[ins.Template.Name] = append(node.inserts[ins.Template.Name], ins)
@@ -215,7 +249,7 @@ func getInserts(node *Node, src source.Node) error {
 	if ins, ok := src.(*source.Insert); ok {
 		nodeForInsert := node.getCurrentOrParent(ins.Template.Namespace)
 		if nodeForInsert == nil {
-			return fmt.Errorf("source: Node.getInserts: namespace '%s' does not exist", ins.Template.Namespace)
+			return fmt.Errorf("maker: Node.getInserts: namespace '%s' does not exist", ins.Template.Namespace)
 		}
 		nodeForInsert.inserts[ins.Template.Name] = append(nodeForInsert.inserts[ins.Template.Name], ins)
 		if ins.Template.IsKey {
