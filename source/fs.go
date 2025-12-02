@@ -139,7 +139,14 @@ func rename(node Fs) error {
 }
 
 func createDir(node *Dir) error {
-	return os.Mkdir(buildPath(node), 0744)
+	err := os.Mkdir(buildPath(node), 0744)
+	if err != nil {
+		return err
+	}
+
+	node.UpdateRealName()
+
+	return nil
 }
 
 func createFile(node *File) error {
@@ -158,6 +165,8 @@ func createFile(node *File) error {
 	if err != nil {
 		return err
 	}
+
+	node.UpdateRealName()
 
 	return nil
 }
