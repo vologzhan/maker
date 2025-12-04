@@ -8,7 +8,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	fsys := os.DirFS("./../test/template-go-full")
+	fsys := os.DirFS("./../test/template-go")
 
 	root, err := New(fsys, "")
 	require.NoError(t, err)

@@ -2,6 +2,7 @@ package maker
 
 import (
 	"github.com/google/uuid"
+	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vologzhan/maker/source"
@@ -157,6 +158,95 @@ func TestReadWithNextKeyPath(t *testing.T) {
 	assert.NotNil(t, root.entrypoints[0].(*source.Dir).Items[1].GetTemplate())
 }
 
+func TestEdit(t *testing.T) {
+	tmpSourceDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpSourceDir)
+
+	err = copy.Copy("./test/edit/before", tmpSourceDir)
+	require.NoError(t, err)
+
+	root, err := newTestNamespace(tmpSourceDir)
+	require.NoError(t, err)
+
+	services, err := root.Children("service")
+	require.NoError(t, err)
+
+	service := services[0]
+	err = service.SetValues(map[string]string{
+		"name": "calendar",
+	})
+	require.NoError(t, err)
+
+	entities, err := service.Children("entity")
+	require.NoError(t, err)
+
+	entity := entities[0]
+	err = entity.SetValues(map[string]string{
+		"name":    "only_uuid",
+		"name_db": "only_uuid",
+	})
+	require.NoError(t, err)
+
+	attributes, err := entity.Children("attribute")
+	require.NoError(t, err)
+
+	attribute := attributes[0]
+	err = attribute.SetValues(map[string]string{
+		"name":    "uuid",
+		"type_go": "uuid.UUID",
+		"name_db": "uuid",
+		"type_db": "uuid",
+		"default": "uuid_generate_v4()",
+	})
+	require.NoError(t, err)
+
+	err = root.Flush()
+	require.NoError(t, err)
+
+	compareDirectory("./test/edit/after", tmpSourceDir, "", "", t)
+}
+
+func TestEditAttribute(t *testing.T) {
+	tmpSourceDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpSourceDir)
+
+	err = copy.Copy("./test/edit-attribute/before", tmpSourceDir)
+	require.NoError(t, err)
+
+	root, err := newTestNamespace(tmpSourceDir)
+	require.NoError(t, err)
+
+	services, err := root.Children("service")
+	require.NoError(t, err)
+
+	entities, err := services[0].Children("entity")
+	require.NoError(t, err)
+
+	attributes, err := entities[0].Children("attribute")
+	require.NoError(t, err)
+
+	attribute := attributes[0]
+	err = attribute.SetValues(map[string]string{
+		"name":    "uuid",
+		"type_go": "uuid.UUID",
+		"name_db": "uuid",
+		"type_db": "uuid",
+		"default": "uuid_generate_v4()",
+	})
+	require.NoError(t, err)
+
+	err = root.Flush()
+	require.NoError(t, err)
+
+	compareDirectory("./test/edit-attribute/after", tmpSourceDir, "", "", t)
+}
+
 // compareDirectory todo compare hashes and show diff only if dont hashes not equals
 // todo show dir name when showing diff files
 func compareDirectory(expected, actual, relativePath, fileSuffix string, t *testing.T) {
@@ -225,7 +315,7 @@ func compareDirectory(expected, actual, relativePath, fileSuffix string, t *test
 func newTestNamespace(srcDir string) (*Node, error) {
 	source.Test = true
 
-	tplDir := os.DirFS("test/template-go-full")
+	tplDir := os.DirFS("test/template-go")
 
 	tpl, err := template.New(tplDir, "")
 	if err != nil {
