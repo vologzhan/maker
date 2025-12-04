@@ -2,11 +2,12 @@ package postgres
 
 import (
 	"database/sql"
+	"time"
+
 	_ "github.com/lib/pq"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
-	"time"
 )
 
 type Config struct {

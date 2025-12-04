@@ -1,9 +1,9 @@
 package main
 
 import (
+	"log"
 	"▶service-name◀-service/shared/env"
 	"▶service-name◀-service/shared/postgres/repositories"
-	"log"
 )
 
 func main() {

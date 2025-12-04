@@ -1,13 +1,14 @@
 package repositories
 
 import (
+	"notification-service/shared/postgres"
+	channel "notification-service/shared/postgres/repositories/channel"
+
 	"github.com/uptrace/bun"
-	"▶service-name◀-service/shared/postgres"
-⏩	▶entityName◀ "▶service-name◀-service/shared/postgres/repositories/▶entity-name◀"⏪
 )
 
 type Repositories struct {
-⏩	▶EntityName◀ *▶entityName◀.Repository⏪
+	Channel *channel.Repository
 }
 
 func New(c postgres.Config) (*Repositories, *bun.DB) {
@@ -15,6 +16,6 @@ func New(c postgres.Config) (*Repositories, *bun.DB) {
 
 	return &Repositories{
 		// maker:keep-di-repositories
-⏩		▶entityName◀.New(db),⏪
+		channel.New(db),
 	}, db
 }

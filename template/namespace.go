@@ -13,6 +13,10 @@ type Namespace struct {
 }
 
 func New(fsys fs.FS, pathPrefix string) (*Namespace, error) {
+	if pathPrefix == "" {
+		pathPrefix = "."
+	}
+
 	dir, err := parseDir(fsys, pathPrefix)
 	if err != nil {
 		return nil, err

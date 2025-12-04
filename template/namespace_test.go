@@ -8,9 +8,9 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	fsys := os.DirFS("./../test/go-template")
+	fsys := os.DirFS("./../test/template-go-full")
 
-	root, err := New(fsys, ".")
+	root, err := New(fsys, "")
 	require.NoError(t, err)
 	assert.Equal(t, "", root.Name)
 	assert.Equal(t, 1, len(root.Entrypoints))

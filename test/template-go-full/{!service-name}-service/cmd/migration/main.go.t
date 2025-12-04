@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/uptrace/bun/migrate"
 	"os"
 	"path/filepath"
 	"strconv"
 	"▶service-name◀-service/shared/env"
 	"▶service-name◀-service/shared/postgres"
+
+	"github.com/uptrace/bun/migrate"
 )
 
 type command string

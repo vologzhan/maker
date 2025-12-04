@@ -2,8 +2,9 @@ package env
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"▶service-name◀-service/shared/postgres"
+
+	"github.com/spf13/viper"
 )
 
 func ReadPath(path string) error {
