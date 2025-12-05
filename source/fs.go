@@ -58,16 +58,17 @@ func SaveRecursive(node Node) error {
 }
 
 func saveRecursive(node Fs) error {
-	var err error
 	switch node := node.(type) {
 	case *Dir:
-		switch node.Status {
-		case FsStatusNotRead, FsStatusNotExist, FsStatusNotChanged:
-			// nothing
-		case FsStatusChanged:
-			err = rename(node)
-		case FsStatusNew:
-			err = createDir(node)
+		if node.Status == FsStatusNew {
+			if err := createDir(node); err != nil {
+				return err
+			}
+		}
+		if node.Status == FsStatusChanged {
+			if err := rename(node); err != nil {
+				return err
+			}
 		}
 
 		for _, child := range node.Items {
@@ -76,21 +77,21 @@ func saveRecursive(node Fs) error {
 			}
 		}
 	case *File:
-		switch node.Status {
-		case FsStatusNotRead, FsStatusNotExist, FsStatusNotChanged:
-			// nothing
-		case FsStatusChanged:
-			err = updateFile(node)
-		case FsStatusNew:
-			err = createFile(node)
+		if node.Status == FsStatusNew {
+			if err := createFile(node); err != nil {
+				return err
+			}
+		}
+		if node.Status == FsStatusChanged {
+			if err := updateFile(node); err != nil {
+				return err
+			}
 		}
 	}
 
-	if err != nil {
-		return err
+	if node.GetFsStatus() > FsStatusNotChanged {
+		node.SetFsStatus(FsStatusNotChanged)
 	}
-
-	node.SetFsStatus(FsStatusNotChanged)
 
 	return nil
 }

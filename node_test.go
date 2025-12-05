@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vologzhan/maker/source"
 	"github.com/vologzhan/maker/template"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,7 +75,7 @@ func TestWriter(t *testing.T) {
 	err = root.Flush()
 	require.NoError(t, err)
 
-	compareDirectory("./test/read-write", tmpSourceDir, "", ".e", t)
+	compareDirectory("./test/read-write", tmpSourceDir, "", t)
 }
 
 func TestReader(t *testing.T) {
@@ -206,7 +206,7 @@ func TestEdit(t *testing.T) {
 	err = root.Flush()
 	require.NoError(t, err)
 
-	compareDirectory("./test/edit/after", tmpSourceDir, "", "", t)
+	compareDirectory("./test/edit/after", tmpSourceDir, "", t)
 }
 
 func TestCreateAttribute(t *testing.T) {
@@ -241,37 +241,65 @@ func TestCreateAttribute(t *testing.T) {
 	err = attr.Flush()
 	require.NoError(t, err)
 
-	compareDirectory("./test/create-fk-attribute/after", tmpSourceDir, "", "", t)
+	compareDirectory("./test/create-fk-attribute/after", tmpSourceDir, "", t)
 }
 
-// compareDirectory todo compare hashes and show diff only if dont hashes not equals
-// todo show dir name when showing diff files
-func compareDirectory(expected, actual, relativePath, fileSuffix string, t *testing.T) {
+func TestCreateEntityAfterFlushService(t *testing.T) {
+	tmpSourceDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpSourceDir)
+
+	err = copy.Copy("./test/create-entity-after-flush-service/before", tmpSourceDir)
+	require.NoError(t, err)
+
+	root, err := newTestNamespace(tmpSourceDir)
+	require.NoError(t, err)
+
+	services, err := root.Children("service")
+	require.NoError(t, err)
+
+	err = services[0].Flush()
+	require.NoError(t, err)
+
+	newEntity, err := services[0].CreateChild("entity", uuid.New(), map[string]string{
+		"name":    "table",
+		"name_db": "table",
+	})
+	require.NoError(t, err)
+
+	err = newEntity.Flush()
+	require.NoError(t, err)
+
+	compareDirectory("./test/create-entity-after-flush-service/after", tmpSourceDir, "", t)
+}
+
+func compareDirectory(expected, actual, relativePath string, t *testing.T) {
 	fullPath1 := filepath.Join(expected, relativePath)
+	files1, err := os.ReadDir(fullPath1)
+	if err != nil {
+		t.Errorf("Error reading directory %s: %v\n", fullPath1, err)
+		return
+	}
+
 	fullPath2 := filepath.Join(actual, relativePath)
-
-	files1, err1 := ioutil.ReadDir(fullPath1) // todo deprecated
-	files2, err2 := ioutil.ReadDir(fullPath2) // todo deprecated
-
-	if err1 != nil {
-		t.Errorf("Error reading directory %s: %v\n", fullPath1, err1)
-		return
-	}
-	if err2 != nil {
-		t.Errorf("Error reading directory %s: %v\n", fullPath2, err2)
+	files2, err := os.ReadDir(fullPath2)
+	if err != nil {
+		t.Errorf("Error reading directory %s: %v\n", fullPath2, err)
 		return
 	}
 
-	fileMap1 := make(map[string]os.FileInfo)
-	fileMap2 := make(map[string]os.FileInfo)
-
+	fileMap1 := make(map[string]fs.DirEntry)
 	for _, file := range files1 {
-		filename := strings.TrimSuffix(file.Name(), fileSuffix)
+		filename := strings.TrimSuffix(file.Name(), ".e")
 		fileMap1[filename] = file
 	}
 
+	fileMap2 := make(map[string]fs.DirEntry)
 	for _, file := range files2 {
-		fileMap2[file.Name()] = file
+		filename := strings.TrimSuffix(file.Name(), ".e")
+		fileMap2[filename] = file
 	}
 
 	for name, file1 := range fileMap1 {
@@ -283,16 +311,17 @@ func compareDirectory(expected, actual, relativePath, fileSuffix string, t *test
 		}
 
 		if file1.IsDir() && file2.IsDir() {
-			compareDirectory(expected, actual, filepath.Join(relativePath, name), fileSuffix, t)
+			compareDirectory(expected, actual, filepath.Join(relativePath, name), t)
 		} else if file1.IsDir() || file2.IsDir() {
 			t.Errorf("One is a directory and other is not: %s\n", filepath.Join(relativePath, name))
 		} else {
 			filepath1 := filepath.Join(fullPath1, file1.Name())
-			filepath2 := filepath.Join(fullPath2, file2.Name())
 			content1, err := os.ReadFile(filepath1)
 			if err != nil {
-				t.Errorf("Error reading file %s: %v\n", filepath2, err)
+				t.Errorf("Error reading file %s: %v\n", filepath1, err)
 			}
+
+			filepath2 := filepath.Join(fullPath2, file2.Name())
 			content2, err := os.ReadFile(filepath2)
 			if err != nil {
 				t.Errorf("Error reading file %s: %v\n", filepath2, err)
