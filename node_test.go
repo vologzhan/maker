@@ -247,6 +247,39 @@ func TestEditAttribute(t *testing.T) {
 	compareDirectory("./test/edit-attribute/after", tmpSourceDir, "", "", t)
 }
 
+func TestCreateAttribute(t *testing.T) {
+	tmpSourceDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpSourceDir)
+
+	err = copy.Copy("./test/create-attribute/before", tmpSourceDir)
+	require.NoError(t, err)
+
+	root, err := newTestNamespace(tmpSourceDir)
+	require.NoError(t, err)
+
+	services, err := root.Children("service")
+	require.NoError(t, err)
+
+	entities, err := services[0].Children("entity")
+	require.NoError(t, err)
+
+	attr, err := entities[0].CreateChild("attribute", uuid.New(), map[string]string{
+		"name":    "hi",
+		"type_go": "int",
+		"name_db": "hi",
+		"type_db": "int",
+	})
+	require.NoError(t, err)
+
+	err = attr.Flush()
+	require.NoError(t, err)
+
+	compareDirectory("./test/create-attribute/after", tmpSourceDir, "", "", t)
+}
+
 // compareDirectory todo compare hashes and show diff only if dont hashes not equals
 // todo show dir name when showing diff files
 func compareDirectory(expected, actual, relativePath, fileSuffix string, t *testing.T) {

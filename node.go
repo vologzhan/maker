@@ -160,10 +160,31 @@ func (n *Node) Delete() error {
 	panic("implement me") // todo
 }
 
+func (n *Node) getEntryByTemplate(tpl template.Node) source.Node {
+	for _, entry := range n.entrypoints {
+		if tpl == entry.GetTemplate() {
+			return entry
+		}
+	}
+	return nil
+}
+
 func findSourceByTemplate(node *Node, tpl template.Node) (source.Node, error) {
-	for _, src := range node.entrypoints {
-		if !template.IsChildOrCurrent(src.GetTemplate(), tpl) {
+	for _, parentTpl := range node.template.Entrypoints {
+		if !template.IsChildOrCurrent(parentTpl, tpl) {
 			continue
+		}
+
+		src := node.getEntryByTemplate(parentTpl)
+		if src == nil {
+			var err error
+			src, err = findSourceByTemplate(node.parent, parentTpl)
+			if err != nil {
+				return nil, err
+			}
+			if src == nil {
+				break
+			}
 		}
 
 		foundNode := source.FindChildByTemplate(src, tpl)
