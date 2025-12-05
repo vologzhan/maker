@@ -53,12 +53,12 @@ func TestWriter(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = entity.CreateChild("attribute", uuid.New(), map[string]string{
-		"name":      "relation_uuid",
-		"type_go":   "uuid.UUID",
-		"name_db":   "relation_uuid",
-		"type_db":   "uuid",
-		"fk_table":  "foreign_table",
-		"fk_column": "foreign_column",
+		"name":     "relation_uuid",
+		"type_go":  "uuid.UUID",
+		"name_db":  "relation_uuid",
+		"type_db":  "uuid",
+		"fk_table": "foreign_table",
+		"fk_type":  "one-to-one",
 	})
 	require.NoError(t, err)
 
@@ -115,8 +115,8 @@ func TestReader(t *testing.T) {
 		"primary_key": "1",
 		"type_db":     "uuid",
 		"default":     "uuid_generate_v4()",
-		"fk_column":   "",
 		"fk_table":    "",
+		"fk_type":     "",
 	}, attributes[0].Values())
 
 	assert.Equal(t, map[string]string{
@@ -128,7 +128,7 @@ func TestReader(t *testing.T) {
 		"type_db":     "uuid",
 		"default":     "",
 		"fk_table":    "foreign_table",
-		"fk_column":   "foreign_column",
+		"fk_type":     "one-to-one",
 	}, attributes[1].Values())
 
 	assert.Equal(t, map[string]string{
@@ -140,7 +140,7 @@ func TestReader(t *testing.T) {
 		"type_db":     "timestamp(0)",
 		"default":     "null",
 		"fk_table":    "",
-		"fk_column":   "",
+		"fk_type":     "",
 	}, attributes[2].Values())
 }
 
@@ -209,44 +209,6 @@ func TestEdit(t *testing.T) {
 	compareDirectory("./test/edit/after", tmpSourceDir, "", "", t)
 }
 
-func TestEditAttribute(t *testing.T) {
-	tmpSourceDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpSourceDir)
-
-	err = copy.Copy("./test/edit-attribute/before", tmpSourceDir)
-	require.NoError(t, err)
-
-	root, err := newTestNamespace(tmpSourceDir)
-	require.NoError(t, err)
-
-	services, err := root.Children("service")
-	require.NoError(t, err)
-
-	entities, err := services[0].Children("entity")
-	require.NoError(t, err)
-
-	attributes, err := entities[0].Children("attribute")
-	require.NoError(t, err)
-
-	attribute := attributes[0]
-	err = attribute.SetValues(map[string]string{
-		"name":    "uuid",
-		"type_go": "uuid.UUID",
-		"name_db": "uuid",
-		"type_db": "uuid",
-		"default": "uuid_generate_v4()",
-	})
-	require.NoError(t, err)
-
-	err = root.Flush()
-	require.NoError(t, err)
-
-	compareDirectory("./test/edit-attribute/after", tmpSourceDir, "", "", t)
-}
-
 func TestCreateAttribute(t *testing.T) {
 	tmpSourceDir, err := os.MkdirTemp("", "")
 	if err != nil {
@@ -254,7 +216,7 @@ func TestCreateAttribute(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpSourceDir)
 
-	err = copy.Copy("./test/create-attribute/before", tmpSourceDir)
+	err = copy.Copy("./test/create-fk-attribute/before", tmpSourceDir)
 	require.NoError(t, err)
 
 	root, err := newTestNamespace(tmpSourceDir)
@@ -266,18 +228,20 @@ func TestCreateAttribute(t *testing.T) {
 	entities, err := services[0].Children("entity")
 	require.NoError(t, err)
 
-	attr, err := entities[0].CreateChild("attribute", uuid.New(), map[string]string{
-		"name":    "hi",
-		"type_go": "int",
-		"name_db": "hi",
-		"type_db": "int",
+	attr, err := entities[1].CreateChild("attribute", uuid.New(), map[string]string{
+		"name":     "employer_id",
+		"type_go":  "int",
+		"name_db":  "employer_id",
+		"type_db":  "int",
+		"fk_table": "employers",
+		"fk_type":  "one-to-one",
 	})
 	require.NoError(t, err)
 
 	err = attr.Flush()
 	require.NoError(t, err)
 
-	compareDirectory("./test/create-attribute/after", tmpSourceDir, "", "", t)
+	compareDirectory("./test/create-fk-attribute/after", tmpSourceDir, "", "", t)
 }
 
 // compareDirectory todo compare hashes and show diff only if dont hashes not equals

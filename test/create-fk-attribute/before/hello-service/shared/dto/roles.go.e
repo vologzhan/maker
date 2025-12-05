@@ -1,5 +1,5 @@
 package dto
 
-type Test struct {
+type Roles struct {
 	Id int
 }

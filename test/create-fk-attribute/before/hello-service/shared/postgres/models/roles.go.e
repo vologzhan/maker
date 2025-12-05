@@ -6,14 +6,14 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type Test struct {
-	bun.BaseModel `bun:"table:test"`
+type Roles struct {
+	bun.BaseModel `bun:"table:roles"`
 
 	Id int `bun:"id,pk"` // maker:type_db=serial
 }
 
-func (m *Test) ToDto() dto.Test {
-	return dto.Test{
+func (m *Roles) ToDto() dto.Roles {
+	return dto.Roles{
 		m.Id,
 	}
 }

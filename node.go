@@ -69,9 +69,17 @@ func (n *Node) CreateChild(nspace string, id uuid.UUID, values map[string]string
 	n.children[tpl.Name] = append(n.children[tpl.Name], child)
 
 	for _, tplEntry := range tpl.Entrypoints {
-		srcParent, err := findSourceByTemplate(n, tplEntry.Parent())
-		if err != nil {
-			return nil, err
+		srcParent := findSourceByTemplate(n, tplEntry.Parent())
+		if srcParent == nil {
+			_, err := readSourceRecursive(n, tplEntry.Parent())
+			if err != nil {
+				return nil, err
+			}
+
+			srcParent = findSourceByTemplate(n, tplEntry.Parent())
+			if srcParent == nil {
+				return nil, errors.New("maker: CreateChild: parent node not found")
+			}
 		}
 
 		srcEntry := source.CreateEntry(tplEntry, srcParent)
@@ -169,7 +177,16 @@ func (n *Node) getEntryByTemplate(tpl template.Node) source.Node {
 	return nil
 }
 
-func findSourceByTemplate(node *Node, tpl template.Node) (source.Node, error) {
+func findSourceByTemplate(node *Node, tpl template.Node) source.Node {
+	for _, src := range node.entrypoints {
+		if template.IsChildOrCurrent(src.GetTemplate(), tpl) {
+			return source.FindChildByTemplate(src, tpl)
+		}
+	}
+	return nil
+}
+
+func readSourceRecursive(node *Node, tpl template.Node) (source.Node, error) {
 	for _, parentTpl := range node.template.Entrypoints {
 		if !template.IsChildOrCurrent(parentTpl, tpl) {
 			continue
@@ -178,7 +195,7 @@ func findSourceByTemplate(node *Node, tpl template.Node) (source.Node, error) {
 		src := node.getEntryByTemplate(parentTpl)
 		if src == nil {
 			var err error
-			src, err = findSourceByTemplate(node.parent, parentTpl)
+			src, err = readSourceRecursive(node.parent, parentTpl)
 			if err != nil {
 				return nil, err
 			}

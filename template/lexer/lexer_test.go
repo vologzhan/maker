@@ -16,7 +16,7 @@ import (
 type Model▶EntityName◀ struct {
 	bun.BaseModel ` + "`" + `bun:"Table:▶⬇Entity➡NameDb◀"` + "`" + `
 
-⏩	▶⬇AttributeName◀ ▶⬇Attribute➡Nullable↔*◀▶⬇Attribute➡TypeGo◀ ` + "`" + `bun:"▶⬇Attribute➡NameDb◀▶⬇Attribute➡PrimaryKey↔,pk◀" maker:"type_db:▶⬇Attribute➡TypeDb◀▶,default:▶⬇Attribute➡Default◀◀▶,fk:▶⬇Attribute➡FkTable◀|▶⬇Attribute➡FkColumn◀◀"` + "`" + `⏪
+⏩	▶⬇AttributeName◀ ▶⬇Attribute➡Nullable↔*◀▶⬇Attribute➡TypeGo◀ ` + "`" + `bun:"▶⬇Attribute➡NameDb◀▶⬇Attribute➡PrimaryKey↔,pk◀" maker:"type_db:▶⬇Attribute➡TypeDb◀▶,default:▶⬇Attribute➡Default◀◀▶,fk:▶⬇Attribute➡FkTable◀|▶⬇Attribute➡FkType◀◀"` + "`" + `⏪
 }
 
 func (m *Model▶EntityName◀) To▶EntityName◀() dto.▶EntityName◀ {
@@ -155,7 +155,7 @@ func (m *Model▶EntityName◀) To▶EntityName◀() dto.▶EntityName◀ {
 			TemplateKey("⬇"),
 			Word("Attribute"),
 			TemplateSeparator("➡"),
-			Word("FkColumn"),
+			Word("FkType"),
 			TemplateEnd("◀"),
 			TemplateEnd("◀"),
 			Word("\"`"),

@@ -12,7 +12,7 @@ type Channel struct {
 	bun.BaseModel `bun:"table:channel"`
 
 	Uuid         uuid.UUID  `bun:"uuid,pk"`       // maker:type_db=uuid,default=uuid_generate_v4()
-	RelationUuid uuid.UUID  `bun:"relation_uuid"` // maker:type_db=uuid,fk=foreign_table|foreign_column
+	RelationUuid uuid.UUID  `bun:"relation_uuid"` // maker:type_db=uuid,fk=foreign_table|one-to-one
 	DeletedAt    *time.Time `bun:"deleted_at"`    // maker:type_db=timestamp(0),default=null
 }
 
