@@ -179,6 +179,11 @@ func FindChildByTemplate(src Node, tpl template.Node) Node {
 	if len(path) > 0 {
 		return nil
 	}
+	fs, ok := nearestNode.(Fs)
+	if ok && fs.GetFsStatus() < FsStatusNotChanged {
+		return nil
+	}
+
 	return nearestNode
 }
 

@@ -275,6 +275,45 @@ func TestCreateEntityAfterFlushService(t *testing.T) {
 	compareDirectory("./test/create-entity-after-flush-service/after", tmpSourceDir, "", t)
 }
 
+func TestCreateEntityAndThenCreateAttributeInAnotherEntity(t *testing.T) {
+	tmpSourceDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpSourceDir)
+
+	err = copy.Copy("./test/create-entity-and-then-create-attribute-in-another-entity/before", tmpSourceDir)
+	require.NoError(t, err)
+
+	root, err := newTestNamespace(tmpSourceDir)
+	require.NoError(t, err)
+
+	services, err := root.Children("service")
+	require.NoError(t, err)
+
+	_, err = services[0].CreateChild("entity", uuid.New(), map[string]string{
+		"name":    "ho",
+		"name_db": "ho",
+	})
+	require.NoError(t, err)
+
+	entities, err := services[0].Children("entity")
+	require.NoError(t, err)
+
+	_, err = entities[0].CreateChild("attribute", uuid.New(), map[string]string{
+		"name":    "foo",
+		"type_go": "int",
+		"name_db": "foo",
+		"type_db": "int",
+	})
+	require.NoError(t, err)
+
+	err = root.Flush()
+	require.NoError(t, err)
+
+	compareDirectory("./test/create-entity-and-then-create-attribute-in-another-entity/after", tmpSourceDir, "", t)
+}
+
 func compareDirectory(expected, actual, relativePath string, t *testing.T) {
 	fullPath1 := filepath.Join(expected, relativePath)
 	files1, err := os.ReadDir(fullPath1)
