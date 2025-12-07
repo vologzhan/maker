@@ -3,6 +3,7 @@ package source
 import (
 	"errors"
 	"fmt"
+	slicesHelper "github.com/vologzhan/maker/helper/slices"
 	"github.com/vologzhan/maker/template"
 	"slices"
 )
@@ -300,4 +301,33 @@ func (n *Imports) AddImportByTypeGo(typeGo string) {
 	}
 
 	n.Items = append(n.Items, imp)
+}
+
+func DeleteNode(n Node) error {
+	if fs, ok := n.(Fs); ok {
+		fs.SetFsStatus(FsStatusDeleted)
+		return nil
+	}
+
+	switch parent := n.GetParent().(type) {
+	case *Imports:
+		slicesHelper.Delete(parent.Items, n.(*Import))
+	case *Template:
+		slicesHelper.Delete(parent.Items, n.(Stringer))
+	case *File:
+		slicesHelper.Delete(parent.Content, n.(Stringer))
+	default:
+		return fmt.Errorf("source: DeleteNode: unexpected node type '%T'", n)
+	}
+
+	fs, err := upToFsNode(n)
+	if err != nil {
+		return err
+	}
+
+	if fs.GetFsStatus() < FsStatusChanged {
+		fs.SetFsStatus(FsStatusChanged)
+	}
+
+	return nil
 }

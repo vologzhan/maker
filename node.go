@@ -4,8 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/vologzhan/maker/helper/slices"
+	"github.com/vologzhan/maker/helper/strcase"
 	"github.com/vologzhan/maker/source"
-	"github.com/vologzhan/maker/strcase"
 	"github.com/vologzhan/maker/template"
 )
 
@@ -82,7 +83,10 @@ func (n *Node) CreateChild(nspace string, id uuid.UUID, values map[string]string
 			}
 		}
 
-		srcEntry := source.CreateEntry(tplEntry, srcParent)
+		srcEntry, err := source.CreateEntry(tplEntry, srcParent)
+		if err != nil {
+			return nil, err
+		}
 		child.entrypoints = append(child.entrypoints, srcEntry)
 
 		if err := setInserts(child, srcEntry); err != nil {
@@ -104,6 +108,26 @@ func (n *Node) Children(nspace string) ([]*Node, error) {
 	}
 
 	return n.children[nspace], nil
+}
+
+func (n *Node) Delete() error {
+	if n.template.Name == "" {
+		return errors.New("maker: Node.Delete: unable to delete root node")
+	}
+
+	if err := n.readPaths(); err != nil {
+		return err
+	}
+
+	for _, entry := range n.entrypoints {
+		if err := source.DeleteNode(entry); err != nil {
+			return err
+		}
+	}
+
+	n.parent.children[n.template.Name] = slices.Delete(n.parent.children[n.template.Name], n)
+
+	return nil
 }
 
 func (n *Node) Flush() error {
@@ -162,10 +186,6 @@ func (n *Node) readPaths() error {
 	}
 
 	return nil
-}
-
-func (n *Node) Delete() error {
-	panic("implement me") // todo
 }
 
 func (n *Node) getEntryByTemplate(tpl template.Node) source.Node {

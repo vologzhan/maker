@@ -18,6 +18,7 @@ const (
 	FsStatusNotChanged
 	FsStatusChanged
 	FsStatusNew
+	FsStatusDeleted
 )
 
 type Fs interface {
@@ -58,6 +59,10 @@ func SaveRecursive(node Node) error {
 }
 
 func saveRecursive(node Fs) error {
+	if node.GetFsStatus() == FsStatusDeleted {
+		return os.RemoveAll(buildRealPath(node))
+	}
+
 	switch node := node.(type) {
 	case *Dir:
 		if node.Status == FsStatusNew {

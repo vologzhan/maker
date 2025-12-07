@@ -13,7 +13,7 @@ func New(tpl *template.Dir, path string) *Dir {
 	return dir
 }
 
-func CreateEntry(tpl template.Node, parent Node) Node {
+func CreateEntry(tpl template.Node, parent Node) (Node, error) {
 	node := createNodeRecursive(tpl, parent, false)
 
 	switch parent := parent.(type) {
@@ -40,10 +40,10 @@ func CreateEntry(tpl template.Node, parent Node) Node {
 	case *Imports:
 		parent.Items = append(parent.Items, node.(*Import))
 	default:
-		panic(fmt.Sprintf("source: CreateEntry: unexpected parent node type '%T'", parent))
+		return nil, fmt.Errorf("source: CreateEntry: unexpected parent node type '%T'", parent)
 	}
 
-	return node
+	return node, nil
 }
 
 func createNodeRecursive(tpl template.Node, parent Node, skipEntry bool) Node {

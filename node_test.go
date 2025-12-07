@@ -314,6 +314,87 @@ func TestCreateEntityAndThenCreateAttributeInAnotherEntity(t *testing.T) {
 	compareDirectory("./test/create-entity-and-then-create-attribute-in-another-entity/after", tmpSourceDir, "", t)
 }
 
+func TestDeleteEntity(t *testing.T) {
+	tmpSourceDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpSourceDir)
+
+	err = copy.Copy("./test/delete/before", tmpSourceDir)
+	require.NoError(t, err)
+
+	root, err := newTestNamespace(tmpSourceDir)
+	require.NoError(t, err)
+
+	services, err := root.Children("service")
+	require.NoError(t, err)
+
+	entities, err := services[0].Children("entity")
+	require.NoError(t, err)
+
+	err = entities[1].Delete()
+	require.NoError(t, err)
+
+	entities, err = services[0].Children("entity")
+	assert.Equal(t, 1, len(entities))
+
+	err = root.Flush()
+	require.NoError(t, err)
+
+	compareDirectory("./test/delete/after-entity", tmpSourceDir, "", t)
+}
+
+func TestDeleteAttribute(t *testing.T) {
+	tmpSourceDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpSourceDir)
+
+	err = copy.Copy("./test/delete/before", tmpSourceDir)
+	require.NoError(t, err)
+
+	root, err := newTestNamespace(tmpSourceDir)
+	require.NoError(t, err)
+
+	services, err := root.Children("service")
+	require.NoError(t, err)
+
+	entities, err := services[0].Children("entity")
+	require.NoError(t, err)
+
+	attributes, err := entities[1].Children("attribute")
+	require.NoError(t, err)
+
+	err = attributes[1].Delete()
+	require.NoError(t, err)
+
+	attributes, err = entities[1].Children("attribute")
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, len(attributes))
+
+	err = root.Flush()
+	require.NoError(t, err)
+
+	compareDirectory("./test/delete/after-attribute", tmpSourceDir, "", t)
+}
+
+func TestUnableToDeleteRootNode(t *testing.T) {
+	tmpSourceDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpSourceDir)
+
+	root, err := newTestNamespace(tmpSourceDir)
+	require.NoError(t, err)
+
+	err = root.Delete()
+	assert.EqualError(t, err, "maker: Node.Delete: unable to delete root node")
+}
+
 func compareDirectory(expected, actual, relativePath string, t *testing.T) {
 	fullPath1 := filepath.Join(expected, relativePath)
 	files1, err := os.ReadDir(fullPath1)
