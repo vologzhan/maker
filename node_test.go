@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-func TestWriter(t *testing.T) {
+func TestCreate(t *testing.T) {
 	tmpSourceDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal(err)
@@ -75,11 +75,11 @@ func TestWriter(t *testing.T) {
 	err = root.Flush()
 	require.NoError(t, err)
 
-	compareDirectory("./test/read-write", tmpSourceDir, "", t)
+	compareDirectory("./test/read-create", tmpSourceDir, "", t)
 }
 
-func TestReader(t *testing.T) {
-	sourceDir := "test/read-write"
+func TestRead(t *testing.T) {
+	sourceDir := "test/read-create"
 
 	root, err := newTestNamespace(sourceDir)
 	require.NoError(t, err)
@@ -216,7 +216,7 @@ func TestCreateAttribute(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpSourceDir)
 
-	err = copy.Copy("./test/create-fk-attribute/before", tmpSourceDir)
+	err = copy.Copy("./test/create-attribute/before", tmpSourceDir)
 	require.NoError(t, err)
 
 	root, err := newTestNamespace(tmpSourceDir)
@@ -241,7 +241,7 @@ func TestCreateAttribute(t *testing.T) {
 	err = attr.Flush()
 	require.NoError(t, err)
 
-	compareDirectory("./test/create-fk-attribute/after", tmpSourceDir, "", t)
+	compareDirectory("./test/create-attribute/after", tmpSourceDir, "", t)
 }
 
 func TestCreateEntityAfterFlushService(t *testing.T) {
