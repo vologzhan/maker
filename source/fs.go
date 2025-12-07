@@ -2,6 +2,7 @@ package source
 
 import (
 	"errors"
+	slicesHelper "github.com/vologzhan/maker/helper/slices"
 	"github.com/vologzhan/maker/template"
 	"go/format"
 	"golang.org/x/tools/imports"
@@ -23,6 +24,7 @@ const (
 
 type Fs interface {
 	Node
+	GetParentDir() *Dir
 	GetParentFs() Fs
 	GetFsStatus() FsStatus
 	SetFsStatus(status FsStatus)
@@ -37,6 +39,13 @@ func (n *Dir) GetParentFs() Fs {
 	}
 	return n.Parent
 }
+func (n *Dir) GetParentDir() *Dir {
+	if n.Parent == nil {
+		return nil
+	}
+	return n.Parent
+}
+func (n *File) GetParentDir() *Dir     { return n.Parent }
 func (n *File) GetParentFs() Fs        { return n.Parent }
 func (n *Dir) GetFsStatus() FsStatus   { return n.Status }
 func (n *File) GetFsStatus() FsStatus  { return n.Status }
@@ -59,12 +68,11 @@ func SaveRecursive(node Node) error {
 }
 
 func saveRecursive(node Fs) error {
-	if node.GetFsStatus() == FsStatusDeleted {
-		return os.RemoveAll(buildRealPath(node))
-	}
-
 	switch node := node.(type) {
 	case *Dir:
+		if node.Status == FsStatusDeleted {
+			return deleteDir(node)
+		}
 		if node.Status == FsStatusNew {
 			if err := createDir(node); err != nil {
 				return err
@@ -82,6 +90,9 @@ func saveRecursive(node Fs) error {
 			}
 		}
 	case *File:
+		if node.Status == FsStatusDeleted {
+			return deleteFile(node)
+		}
 		if node.Status == FsStatusNew {
 			if err := createFile(node); err != nil {
 				return err
@@ -97,6 +108,26 @@ func saveRecursive(node Fs) error {
 	if node.GetFsStatus() > FsStatusNotChanged {
 		node.SetFsStatus(FsStatusNotChanged)
 	}
+
+	return nil
+}
+
+func deleteDir(node *Dir) error {
+	err := os.RemoveAll(buildRealPath(node))
+	if err != nil {
+		return err
+	}
+	slicesHelper.Delete(node.Parent.Items, Fs(node))
+
+	return nil
+}
+
+func deleteFile(node *File) error {
+	err := os.Remove(buildRealPath(node))
+	if err != nil {
+		return err
+	}
+	slicesHelper.Delete(node.Parent.Items, Fs(node))
 
 	return nil
 }

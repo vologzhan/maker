@@ -130,6 +130,8 @@ func (n *Node) Delete() error {
 	return nil
 }
 
+// Flush apply changes to file system.
+// Nodes cannot be rolled back.
 func (n *Node) Flush() error {
 	for _, src := range n.entrypoints {
 		if err := source.SaveRecursive(src); err != nil {

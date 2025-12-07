@@ -305,7 +305,15 @@ func (n *Imports) AddImportByTypeGo(typeGo string) {
 
 func DeleteNode(n Node) error {
 	if fs, ok := n.(Fs); ok {
-		fs.SetFsStatus(FsStatusDeleted)
+		switch fs.GetFsStatus() {
+		case FsStatusNotRead, FsStatusNotExist:
+			return nil
+		case FsStatusNew:
+			parentDir := fs.GetParentDir()
+			slicesHelper.Delete(parentDir.Items, fs)
+		default:
+			fs.SetFsStatus(FsStatusDeleted)
+		}
 		return nil
 	}
 
@@ -325,7 +333,7 @@ func DeleteNode(n Node) error {
 		return err
 	}
 
-	if fs.GetFsStatus() < FsStatusChanged {
+	if fs.GetFsStatus() == FsStatusNotChanged {
 		fs.SetFsStatus(FsStatusChanged)
 	}
 
