@@ -83,7 +83,10 @@ func readPath(node Fs, path []template.Fs) ([]Node, error) {
 }
 
 func readFile(file *File) error {
-	realPath := buildRealPath(file)
+	realPath, err := buildRealPath(file)
+	if err != nil {
+		return err
+	}
 
 	content, err := os.ReadFile(realPath)
 	if err != nil {
@@ -100,7 +103,10 @@ func readFile(file *File) error {
 }
 
 func readDir(dir *Dir) error {
-	realPath := buildRealPath(dir)
+	realPath, err := buildRealPath(dir)
+	if err != nil {
+		return err
+	}
 
 	entries, err := os.ReadDir(realPath)
 	if err != nil {
@@ -190,7 +196,12 @@ func hasNextKeyPath(dir *Dir, tpl *template.Dir) (bool, error) {
 		nextTpl = nextDir.NextInKeyPath
 	}
 
-	searchPattern := pathBase.Join(buildRealPath(dir), pathBase.Join(path...))
+	realPath, err := buildRealPath(dir)
+	if err != nil {
+		return false, err
+	}
+
+	searchPattern := pathBase.Join(realPath, pathBase.Join(path...))
 
 	matches, err := filepath.Glob(searchPattern)
 	if err != nil {

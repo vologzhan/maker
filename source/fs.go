@@ -112,26 +112,6 @@ func saveRecursive(node Fs) error {
 	return nil
 }
 
-func deleteDir(node *Dir) error {
-	err := os.RemoveAll(buildRealPath(node))
-	if err != nil {
-		return err
-	}
-	slicesHelper.Delete(node.Parent.Items, Fs(node))
-
-	return nil
-}
-
-func deleteFile(node *File) error {
-	err := os.Remove(buildRealPath(node))
-	if err != nil {
-		return err
-	}
-	slicesHelper.Delete(node.Parent.Items, Fs(node))
-
-	return nil
-}
-
 func upToFsNode(node Node) (Fs, error) {
 	for ; node != nil; node = node.GetParent() {
 		if fs, ok := node.(Fs); ok {
@@ -142,24 +122,36 @@ func upToFsNode(node Node) (Fs, error) {
 	return nil, errors.New("source: upToFsNode: not found")
 }
 
-func buildPath(node Fs) string {
+func buildPath(node Fs) (string, error) {
 	var buf []string
 	for ; node != nil; node = node.GetParentFs() {
-		buf = append(buf, node.GetName())
+		name := node.GetName()
+		if name == "" {
+			return "", errors.New("source: buildPath: empty part of path")
+		}
+
+		buf = append(buf, name)
 	}
+
 	slices.Reverse(buf)
 
-	return path.Join(buf...)
+	return path.Join(buf...), nil
 }
 
-func buildRealPath(node Fs) string {
+func buildRealPath(node Fs) (string, error) {
 	var buf []string
 	for ; node != nil; node = node.GetParentFs() {
+		name := node.GetRealName()
+		if name == "" {
+			return "", errors.New("source: buildRealPath: empty part of path")
+		}
+
 		buf = append(buf, node.GetRealName())
 	}
+
 	slices.Reverse(buf)
 
-	return path.Join(buf...)
+	return path.Join(buf...), nil
 }
 
 func rename(node Fs) error {
@@ -167,16 +159,33 @@ func rename(node Fs) error {
 		return nil
 	}
 
-	if err := os.Rename(buildRealPath(node), buildPath(node)); err != nil {
+	oldPath, err := buildRealPath(node)
+	if err != nil {
 		return err
 	}
+
+	newPath, err := buildPath(node)
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(oldPath, newPath)
+	if err != nil {
+		return err
+	}
+
 	node.UpdateRealName()
 
 	return nil
 }
 
 func createDir(node *Dir) error {
-	err := os.Mkdir(buildPath(node), 0744)
+	newPath, err := buildPath(node)
+	if err != nil {
+		return err
+	}
+
+	err = os.Mkdir(newPath, 0744)
 	if err != nil {
 		return err
 	}
@@ -187,7 +196,12 @@ func createDir(node *Dir) error {
 }
 
 func createFile(node *File) error {
-	file, err := os.Create(buildPath(node))
+	newPath, err := buildPath(node)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(newPath)
 	if err != nil {
 		return err
 	}
@@ -208,12 +222,45 @@ func createFile(node *File) error {
 	return nil
 }
 
+func deleteDir(node *Dir) error {
+	realPath, err := buildRealPath(node)
+	if err != nil {
+		return err
+	}
+
+	err = os.RemoveAll(realPath)
+	if err != nil {
+		return err
+	}
+	slicesHelper.Delete(node.Parent.Items, Fs(node))
+
+	return nil
+}
+
+func deleteFile(node *File) error {
+	realPath, err := buildRealPath(node)
+	if err != nil {
+		return err
+	}
+
+	err = os.Remove(realPath)
+	if err != nil {
+		return err
+	}
+	slicesHelper.Delete(node.Parent.Items, Fs(node))
+
+	return nil
+}
+
 func updateFile(f *File) error {
 	if err := rename(f); err != nil {
 		return err
 	}
 
-	realPath := buildRealPath(f)
+	realPath, err := buildRealPath(f)
+	if err != nil {
+		return err
+	}
 
 	file, err := os.OpenFile(realPath, os.O_WRONLY|os.O_TRUNC, 0666)
 	if err != nil {
