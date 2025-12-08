@@ -15,34 +15,23 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	tmpSourceDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpSourceDir)
+	tmpDir := mustCreateTmpDir(t)
+	defer os.RemoveAll(tmpDir)
 
-	root, err := newTestNamespace(tmpSourceDir)
-	require.NoError(t, err)
-
-	service, err := root.CreateChild("service", uuid.New(), map[string]string{
+	root := newTestMaker(t, tmpDir)
+	service := root.mustCreateChild(t, "service", uuid.New(), map[string]string{
 		"name": "notification",
 	})
-	require.NoError(t, err)
-
-	_, err = service.CreateChild("sql", uuid.New(), map[string]string{
+	_ = service.mustCreateChild(t, "sql", uuid.New(), map[string]string{
 		"name": "20240109_init",
 		"up":   "CREATE TABLE channel;",
 		"down": "DROP TABLE channel;",
 	})
-	require.NoError(t, err)
-
-	entity, err := service.CreateChild("entity", uuid.New(), map[string]string{
+	entity := service.mustCreateChild(t, "entity", uuid.New(), map[string]string{
 		"name":    "Channel",
 		"name_db": "channel",
 	})
-	require.NoError(t, err)
-
-	_, err = entity.CreateChild("attribute", uuid.New(), map[string]string{
+	_ = entity.mustCreateChild(t, "attribute", uuid.New(), map[string]string{
 		"name":        "uuid",
 		"type_go":     "uuid.UUID",
 		"name_db":     "uuid",
@@ -50,9 +39,7 @@ func TestCreate(t *testing.T) {
 		"type_db":     "uuid",
 		"default":     "uuid_generate_v4()",
 	})
-	require.NoError(t, err)
-
-	_, err = entity.CreateChild("attribute", uuid.New(), map[string]string{
+	_ = entity.mustCreateChild(t, "attribute", uuid.New(), map[string]string{
 		"name":     "relation_uuid",
 		"type_go":  "uuid.UUID",
 		"name_db":  "relation_uuid",
@@ -60,9 +47,7 @@ func TestCreate(t *testing.T) {
 		"fk_table": "foreign_table",
 		"fk_type":  "one-to-one",
 	})
-	require.NoError(t, err)
-
-	_, err = entity.CreateChild("attribute", uuid.New(), map[string]string{
+	_ = entity.mustCreateChild(t, "attribute", uuid.New(), map[string]string{
 		"name":     "DeletedAt",
 		"nullable": "1",
 		"type_go":  "time.Time",
@@ -70,41 +55,34 @@ func TestCreate(t *testing.T) {
 		"type_db":  "timestamp(0)",
 		"default":  "null",
 	})
-	require.NoError(t, err)
+	root.mustFlush(t)
 
-	err = root.Flush()
-	require.NoError(t, err)
-
-	compareDirectory("./test/read-create", tmpSourceDir, "", t)
+	compareDirectory("./test/read-create", tmpDir, "", t)
 }
 
 func TestRead(t *testing.T) {
 	sourceDir := "test/read-create"
 
-	root, err := newTestNamespace(sourceDir)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{
+	root := newTestMaker(t, sourceDir)
+	require.Equal(t, 1, len(root.entrypoints))
+	assert.Equal(t, map[string]string{
 		"path": sourceDir,
 	}, root.Values())
-	require.Equal(t, 1, len(root.entrypoints))
 
-	services, err := root.Children("service")
-	require.NoError(t, err)
+	services := root.mustChildren(t, "service")
 	require.Equal(t, 1, len(services))
-	require.Equal(t, map[string]string{
+	assert.Equal(t, map[string]string{
 		"name": "notification",
 	}, services[0].Values())
 
-	entities, err := services[0].Children("entity")
-	require.NoError(t, err)
+	entities := services[0].mustChildren(t, "entity")
 	require.Equal(t, 1, len(entities))
-	require.Equal(t, map[string]string{
+	assert.Equal(t, map[string]string{
 		"name":    "channel",
 		"name_db": "channel",
 	}, entities[0].Values())
 
-	attributes, err := entities[0].Children("attribute")
-	require.NoError(t, err)
+	attributes := entities[0].mustChildren(t, "attribute")
 	require.Equal(t, 3, len(attributes))
 
 	assert.Equal(t, map[string]string{
@@ -145,253 +123,159 @@ func TestRead(t *testing.T) {
 }
 
 func TestReadWithNextKeyPath(t *testing.T) {
-	root, err := newTestNamespace("test/read-with-next-key-path")
-	require.NoError(t, err)
-
-	services, err := root.Children("service")
-	require.NoError(t, err)
+	root := newTestMaker(t, "test/read-with-next-key-path")
+	services := root.mustChildren(t, "service")
 
 	assert.Equal(t, 1, len(services))
-
 	assert.Equal(t, 2, len(root.entrypoints[0].(*source.Dir).Items))
 	assert.Nil(t, root.entrypoints[0].(*source.Dir).Items[0].GetTemplate())
 	assert.NotNil(t, root.entrypoints[0].(*source.Dir).Items[1].GetTemplate())
 }
 
 func TestEdit(t *testing.T) {
-	tmpSourceDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpSourceDir)
+	tmpDir := mustCopyToTmp(t, "./test/edit/before")
+	defer os.RemoveAll(tmpDir)
 
-	err = copy.Copy("./test/edit/before", tmpSourceDir)
-	require.NoError(t, err)
+	root := newTestMaker(t, tmpDir)
 
-	root, err := newTestNamespace(tmpSourceDir)
-	require.NoError(t, err)
-
-	services, err := root.Children("service")
-	require.NoError(t, err)
-
-	service := services[0]
-	err = service.SetValues(map[string]string{
+	services := root.mustChildren(t, "service")
+	services[0].mustSetValues(t, map[string]string{
 		"name": "calendar",
 	})
-	require.NoError(t, err)
 
-	entities, err := service.Children("entity")
-	require.NoError(t, err)
-
-	entity := entities[0]
-	err = entity.SetValues(map[string]string{
+	entities := services[0].mustChildren(t, "entity")
+	entities[0].mustSetValues(t, map[string]string{
 		"name":    "only_uuid",
 		"name_db": "only_uuid",
 	})
-	require.NoError(t, err)
 
-	attributes, err := entity.Children("attribute")
-	require.NoError(t, err)
-
-	attribute := attributes[0]
-	err = attribute.SetValues(map[string]string{
+	attributes := entities[0].mustChildren(t, "attribute")
+	attributes[0].mustSetValues(t, map[string]string{
 		"name":    "uuid",
 		"type_go": "uuid.UUID",
 		"name_db": "uuid",
 		"type_db": "uuid",
 		"default": "uuid_generate_v4()",
 	})
-	require.NoError(t, err)
 
-	err = root.Flush()
-	require.NoError(t, err)
+	root.mustFlush(t)
 
-	compareDirectory("./test/edit/after", tmpSourceDir, "", t)
+	compareDirectory("./test/edit/after", tmpDir, "", t)
 }
 
 func TestCreateAttribute(t *testing.T) {
-	tmpSourceDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpSourceDir)
+	tmpDir := mustCopyToTmp(t, "./test/create-attribute/before")
+	defer os.RemoveAll(tmpDir)
 
-	err = copy.Copy("./test/create-attribute/before", tmpSourceDir)
-	require.NoError(t, err)
+	newTestMaker(t, tmpDir).
+		mustChildren(t, "service")[0].
+		mustChildren(t, "entity")[1].
+		mustCreateChild(t, "attribute", uuid.New(), map[string]string{
+			"name":     "employer_id",
+			"type_go":  "int",
+			"name_db":  "employer_id",
+			"type_db":  "int",
+			"fk_table": "employers",
+			"fk_type":  "one-to-one",
+		}).
+		mustFlush(t)
 
-	root, err := newTestNamespace(tmpSourceDir)
-	require.NoError(t, err)
-
-	services, err := root.Children("service")
-	require.NoError(t, err)
-
-	entities, err := services[0].Children("entity")
-	require.NoError(t, err)
-
-	attr, err := entities[1].CreateChild("attribute", uuid.New(), map[string]string{
-		"name":     "employer_id",
-		"type_go":  "int",
-		"name_db":  "employer_id",
-		"type_db":  "int",
-		"fk_table": "employers",
-		"fk_type":  "one-to-one",
-	})
-	require.NoError(t, err)
-
-	err = attr.Flush()
-	require.NoError(t, err)
-
-	compareDirectory("./test/create-attribute/after", tmpSourceDir, "", t)
+	compareDirectory("./test/create-attribute/after", tmpDir, "", t)
 }
 
 func TestCreateEntityAfterFlushService(t *testing.T) {
-	tmpSourceDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpSourceDir)
+	tmpDir := mustCopyToTmp(t, "./test/create-entity-after-flush-service/before")
+	defer os.RemoveAll(tmpDir)
 
-	err = copy.Copy("./test/create-entity-after-flush-service/before", tmpSourceDir)
-	require.NoError(t, err)
+	root := newTestMaker(t, tmpDir)
+	services := root.mustChildren(t, "service")
 
-	root, err := newTestNamespace(tmpSourceDir)
-	require.NoError(t, err)
+	services[0].mustFlush(t)
 
-	services, err := root.Children("service")
-	require.NoError(t, err)
-
-	err = services[0].Flush()
-	require.NoError(t, err)
-
-	newEntity, err := services[0].CreateChild("entity", uuid.New(), map[string]string{
+	newEntity := services[0].mustCreateChild(t, "entity", uuid.New(), map[string]string{
 		"name":    "table",
 		"name_db": "table",
 	})
-	require.NoError(t, err)
 
-	err = newEntity.Flush()
-	require.NoError(t, err)
+	newEntity.mustFlush(t)
 
-	compareDirectory("./test/create-entity-after-flush-service/after", tmpSourceDir, "", t)
+	compareDirectory("./test/create-entity-after-flush-service/after", tmpDir, "", t)
 }
 
 func TestCreateEntityAndThenCreateAttributeInAnotherEntity(t *testing.T) {
-	tmpSourceDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpSourceDir)
+	tmpDir := mustCopyToTmp(t, "./test/create-entity-and-then-create-attribute-in-another-entity/before")
+	defer os.RemoveAll(tmpDir)
 
-	err = copy.Copy("./test/create-entity-and-then-create-attribute-in-another-entity/before", tmpSourceDir)
-	require.NoError(t, err)
+	root := newTestMaker(t, tmpDir)
 
-	root, err := newTestNamespace(tmpSourceDir)
-	require.NoError(t, err)
-
-	services, err := root.Children("service")
-	require.NoError(t, err)
-
-	_, err = services[0].CreateChild("entity", uuid.New(), map[string]string{
+	services := root.mustChildren(t, "service")
+	_ = services[0].mustCreateChild(t, "entity", uuid.New(), map[string]string{
 		"name":    "ho",
 		"name_db": "ho",
 	})
-	require.NoError(t, err)
 
-	entities, err := services[0].Children("entity")
-	require.NoError(t, err)
-
-	_, err = entities[0].CreateChild("attribute", uuid.New(), map[string]string{
+	entities := services[0].mustChildren(t, "entity")
+	_ = entities[0].mustCreateChild(t, "attribute", uuid.New(), map[string]string{
 		"name":    "foo",
 		"type_go": "int",
 		"name_db": "foo",
 		"type_db": "int",
 	})
-	require.NoError(t, err)
 
-	err = root.Flush()
-	require.NoError(t, err)
+	root.mustFlush(t)
 
-	compareDirectory("./test/create-entity-and-then-create-attribute-in-another-entity/after", tmpSourceDir, "", t)
+	compareDirectory("./test/create-entity-and-then-create-attribute-in-another-entity/after", tmpDir, "", t)
 }
 
 func TestDeleteEntity(t *testing.T) {
-	tmpSourceDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpSourceDir)
+	tmpDir := mustCopyToTmp(t, "./test/delete/before")
+	defer os.RemoveAll(tmpDir)
 
-	err = copy.Copy("./test/delete/before", tmpSourceDir)
-	require.NoError(t, err)
+	root := newTestMaker(t, tmpDir)
 
-	root, err := newTestNamespace(tmpSourceDir)
-	require.NoError(t, err)
+	root.mustChildren(t, "service")[0].
+		mustChildren(t, "entity")[1].
+		mustDelete(t)
 
-	services, err := root.Children("service")
-	require.NoError(t, err)
+	root.mustFlush(t)
 
-	entities, err := services[0].Children("entity")
-	require.NoError(t, err)
+	entities := root.mustChildren(t, "service")[0].
+		mustChildren(t, "entity")
 
-	err = entities[1].Delete()
-	require.NoError(t, err)
-
-	entities, err = services[0].Children("entity")
 	assert.Equal(t, 1, len(entities))
 
-	err = root.Flush()
-	require.NoError(t, err)
-
-	compareDirectory("./test/delete/after-entity", tmpSourceDir, "", t)
+	compareDirectory("./test/delete/after-entity", tmpDir, "", t)
 }
 
 func TestDeleteAttribute(t *testing.T) {
-	tmpSourceDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpSourceDir)
+	tmpDir := mustCopyToTmp(t, "./test/delete/before")
+	defer os.RemoveAll(tmpDir)
 
-	err = copy.Copy("./test/delete/before", tmpSourceDir)
-	require.NoError(t, err)
+	root := newTestMaker(t, tmpDir)
 
-	root, err := newTestNamespace(tmpSourceDir)
-	require.NoError(t, err)
+	root.mustChildren(t, "service")[0].
+		mustChildren(t, "entity")[1].
+		mustChildren(t, "attribute")[1].
+		mustDelete(t)
 
-	services, err := root.Children("service")
-	require.NoError(t, err)
+	root.mustFlush(t)
 
-	entities, err := services[0].Children("entity")
-	require.NoError(t, err)
-
-	attributes, err := entities[1].Children("attribute")
-	require.NoError(t, err)
-
-	err = attributes[1].Delete()
-	require.NoError(t, err)
-
-	attributes, err = entities[1].Children("attribute")
-	require.NoError(t, err)
+	attributes := root.mustChildren(t, "service")[0].
+		mustChildren(t, "entity")[1].
+		mustChildren(t, "attribute")
 
 	assert.Equal(t, 1, len(attributes))
 
-	err = root.Flush()
-	require.NoError(t, err)
-
-	compareDirectory("./test/delete/after-attribute", tmpSourceDir, "", t)
+	compareDirectory("./test/delete/after-attribute", tmpDir, "", t)
 }
 
 func TestUnableToDeleteRootNode(t *testing.T) {
-	tmpSourceDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpSourceDir)
+	tmpDir := mustCreateTmpDir(t)
+	defer os.RemoveAll(tmpDir)
 
-	root, err := newTestNamespace(tmpSourceDir)
-	require.NoError(t, err)
+	root := newTestMaker(t, tmpDir)
+	err := root.Delete()
 
-	err = root.Delete()
 	assert.EqualError(t, err, "maker: Node.Delete: unable to delete root node")
 }
 
@@ -458,15 +342,60 @@ func compareDirectory(expected, actual, relativePath string, t *testing.T) {
 	}
 }
 
-func newTestNamespace(srcDir string) (*Node, error) {
+func newTestMaker(t *testing.T, srcDir string) *Node {
 	source.Test = true
 
 	tplDir := os.DirFS("test/template-go")
-
 	tpl, err := template.New(tplDir, "")
+	require.NoError(t, err)
+
+	n, err := New(tpl, srcDir)
+	require.NoError(t, err)
+
+	return n
+}
+
+func mustCreateTmpDir(t *testing.T) string {
+	tmpDir, err := os.MkdirTemp("", "")
+	require.NoError(t, err)
+	return tmpDir
+}
+
+func mustCopyToTmp(t *testing.T, src string) string {
+	tmpDir := mustCreateTmpDir(t)
+
+	err := copy.Copy(src, tmpDir)
 	if err != nil {
-		return nil, err
+		defer os.RemoveAll(tmpDir)
+		require.NoError(t, err)
 	}
 
-	return New(tpl, srcDir)
+	return tmpDir
+}
+
+func (n *Node) mustCreateChild(t *testing.T, nspace string, id uuid.UUID, values map[string]string) *Node {
+	node, err := n.CreateChild(nspace, id, values)
+	require.NoError(t, err)
+	return node
+}
+
+func (n *Node) mustChildren(t *testing.T, nspace string) []*Node {
+	nodes, err := n.Children(nspace)
+	require.NoError(t, err)
+	return nodes
+}
+
+func (n *Node) mustSetValues(t *testing.T, values map[string]string) {
+	err := n.SetValues(values)
+	require.NoError(t, err)
+}
+
+func (n *Node) mustDelete(t *testing.T) {
+	err := n.Delete()
+	require.NoError(t, err)
+}
+
+func (n *Node) mustFlush(t *testing.T) {
+	err := n.Flush()
+	require.NoError(t, err)
 }
