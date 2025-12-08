@@ -71,18 +71,22 @@ func TestRead(t *testing.T) {
 
 	services := root.mustChildren(t, "service")
 	require.Equal(t, 1, len(services))
+
+	service := services[0]
 	assert.Equal(t, map[string]string{
 		"name": "notification",
-	}, services[0].Values())
+	}, service.Values())
 
-	entities := services[0].mustChildren(t, "entity")
+	entities := service.mustChildren(t, "entity")
 	require.Equal(t, 1, len(entities))
+
+	entity := entities[0]
 	assert.Equal(t, map[string]string{
 		"name":    "channel",
 		"name_db": "channel",
-	}, entities[0].Values())
+	}, entity.Values())
 
-	attributes := entities[0].mustChildren(t, "attribute")
+	attributes := entity.mustChildren(t, "attribute")
 	require.Equal(t, 3, len(attributes))
 
 	assert.Equal(t, map[string]string{
@@ -138,19 +142,19 @@ func TestEdit(t *testing.T) {
 
 	root := newTestMaker(t, tmpDir)
 
-	services := root.mustChildren(t, "service")
-	services[0].mustSetValues(t, map[string]string{
+	service := root.mustChildren(t, "service")[0]
+	service.mustSetValues(t, map[string]string{
 		"name": "calendar",
 	})
 
-	entities := services[0].mustChildren(t, "entity")
-	entities[0].mustSetValues(t, map[string]string{
+	entity := service.mustChildren(t, "entity")[0]
+	entity.mustSetValues(t, map[string]string{
 		"name":    "only_uuid",
 		"name_db": "only_uuid",
 	})
 
-	attributes := entities[0].mustChildren(t, "attribute")
-	attributes[0].mustSetValues(t, map[string]string{
+	attribute := entity.mustChildren(t, "attribute")[0]
+	attribute.mustSetValues(t, map[string]string{
 		"name":    "uuid",
 		"type_go": "uuid.UUID",
 		"name_db": "uuid",
@@ -158,7 +162,7 @@ func TestEdit(t *testing.T) {
 		"default": "uuid_generate_v4()",
 	})
 
-	root.mustFlush(t)
+	service.mustFlush(t)
 
 	compareDirectory("./test/edit/after", tmpDir, "", t)
 }
@@ -188,15 +192,14 @@ func TestCreateEntityAfterFlushService(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
-	services := root.mustChildren(t, "service")
 
-	services[0].mustFlush(t)
+	service := root.mustChildren(t, "service")[0]
+	service.mustFlush(t)
 
-	newEntity := services[0].mustCreateChild(t, "entity", uuid.New(), map[string]string{
+	newEntity := service.mustCreateChild(t, "entity", uuid.New(), map[string]string{
 		"name":    "table",
 		"name_db": "table",
 	})
-
 	newEntity.mustFlush(t)
 
 	compareDirectory("./test/create-entity-after-flush-service/after", tmpDir, "", t)
@@ -208,34 +211,34 @@ func TestCreateEntityAndThenCreateAttributeInAnotherEntity(t *testing.T) {
 
 	root := newTestMaker(t, tmpDir)
 
-	services := root.mustChildren(t, "service")
-	_ = services[0].mustCreateChild(t, "entity", uuid.New(), map[string]string{
+	service := root.mustChildren(t, "service")[0]
+	_ = service.mustCreateChild(t, "entity", uuid.New(), map[string]string{
 		"name":    "ho",
 		"name_db": "ho",
 	})
 
-	entities := services[0].mustChildren(t, "entity")
-	_ = entities[0].mustCreateChild(t, "attribute", uuid.New(), map[string]string{
+	entity := service.mustChildren(t, "entity")[0]
+	_ = entity.mustCreateChild(t, "attribute", uuid.New(), map[string]string{
 		"name":    "foo",
 		"type_go": "int",
 		"name_db": "foo",
 		"type_db": "int",
 	})
 
-	root.mustFlush(t)
+	service.mustFlush(t)
 
 	compareDirectory("./test/create-entity-and-then-create-attribute-in-another-entity/after", tmpDir, "", t)
 }
 
-func TestDeleteEntities(t *testing.T) {
+func TestDeleteEntity(t *testing.T) {
 	tmpDir := mustCopyToTmp(t, "./test/delete/before")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
 	service := root.mustChildren(t, "service")[0]
-	entities := service.mustChildren(t, "entity")
-	entities[0].mustDelete(t)
-	root.mustFlush(t)
+	entity := service.mustChildren(t, "entity")[0]
+	entity.mustDelete(t)
+	entity.mustFlush(t)
 
 	assert.Equal(t, 1, len(service.mustChildren(t, "entity")))
 
@@ -248,16 +251,13 @@ func TestDeleteAttribute(t *testing.T) {
 
 	root := newTestMaker(t, tmpDir)
 
-	root.mustChildren(t, "service")[0].
-		mustChildren(t, "entity")[1].
-		mustChildren(t, "attribute")[1].
-		mustDelete(t)
+	service := root.mustChildren(t, "service")[0]
+	entity := service.mustChildren(t, "entity")[1]
+	attribute := entity.mustChildren(t, "attribute")[1]
+	attribute.mustDelete(t)
+	attribute.mustFlush(t)
 
-	root.mustFlush(t)
-
-	attributes := root.mustChildren(t, "service")[0].
-		mustChildren(t, "entity")[1].
-		mustChildren(t, "attribute")
+	attributes := entity.mustChildren(t, "attribute")
 
 	assert.Equal(t, 1, len(attributes))
 
