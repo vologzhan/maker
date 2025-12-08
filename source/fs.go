@@ -84,8 +84,8 @@ func saveRecursive(node Fs) error {
 			}
 		}
 
-		for _, child := range node.Items {
-			if err := saveRecursive(child); err != nil {
+		for i := len(node.Items) - 1; i >= 0; i-- {
+			if err := saveRecursive(node.Items[i]); err != nil {
 				return err
 			}
 		}

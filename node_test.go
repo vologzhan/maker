@@ -227,22 +227,17 @@ func TestCreateEntityAndThenCreateAttributeInAnotherEntity(t *testing.T) {
 	compareDirectory("./test/create-entity-and-then-create-attribute-in-another-entity/after", tmpDir, "", t)
 }
 
-func TestDeleteEntity(t *testing.T) {
+func TestDeleteEntities(t *testing.T) {
 	tmpDir := mustCopyToTmp(t, "./test/delete/before")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
-
-	root.mustChildren(t, "service")[0].
-		mustChildren(t, "entity")[1].
-		mustDelete(t)
-
+	service := root.mustChildren(t, "service")[0]
+	entities := service.mustChildren(t, "entity")
+	entities[0].mustDelete(t)
 	root.mustFlush(t)
 
-	entities := root.mustChildren(t, "service")[0].
-		mustChildren(t, "entity")
-
-	assert.Equal(t, 1, len(entities))
+	assert.Equal(t, 1, len(service.mustChildren(t, "entity")))
 
 	compareDirectory("./test/delete/after-entity", tmpDir, "", t)
 }
