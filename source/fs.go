@@ -232,7 +232,7 @@ func deleteDir(node *Dir) error {
 	if err != nil {
 		return err
 	}
-	slicesHelper.Delete(node.Parent.Items, Fs(node))
+	node.Parent.Items = slicesHelper.Delete(node.Parent.Items, Fs(node))
 
 	return nil
 }
@@ -247,7 +247,7 @@ func deleteFile(node *File) error {
 	if err != nil {
 		return err
 	}
-	slicesHelper.Delete(node.Parent.Items, Fs(node))
+	node.Parent.Items = slicesHelper.Delete(node.Parent.Items, Fs(node))
 
 	return nil
 }

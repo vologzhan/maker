@@ -310,7 +310,7 @@ func DeleteNode(n Node) error {
 			return nil
 		case FsStatusNew:
 			parentDir := fs.GetParentDir()
-			slicesHelper.Delete(parentDir.Items, fs)
+			parentDir.Items = slicesHelper.Delete(parentDir.Items, fs)
 		default:
 			fs.SetFsStatus(FsStatusDeleted)
 		}
@@ -319,11 +319,11 @@ func DeleteNode(n Node) error {
 
 	switch parent := n.GetParent().(type) {
 	case *Imports:
-		slicesHelper.Delete(parent.Items, n.(*Import))
+		parent.Items = slicesHelper.Delete(parent.Items, n.(*Import))
 	case *Template:
-		slicesHelper.Delete(parent.Items, n.(Stringer))
+		parent.Items = slicesHelper.Delete(parent.Items, n.(Stringer))
 	case *File:
-		slicesHelper.Delete(parent.Content, n.(Stringer))
+		parent.Content = slicesHelper.Delete(parent.Content, n.(Stringer))
 	default:
 		return fmt.Errorf("source: DeleteNode: unexpected node type '%T'", n)
 	}
