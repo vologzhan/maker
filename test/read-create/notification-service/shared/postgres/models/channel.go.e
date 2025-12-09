@@ -14,6 +14,8 @@ type Channel struct {
 	Uuid         uuid.UUID  `bun:"uuid,pk"`       // maker:type_db=uuid,default=uuid_generate_v4()
 	RelationUuid uuid.UUID  `bun:"relation_uuid"` // maker:type_db=uuid,fk=foreign_table|one-to-one
 	DeletedAt    *time.Time `bun:"deleted_at"`    // maker:type_db=timestamp(0),default=null
+
+	// maker:keep-model-relations
 }
 
 func (m *Channel) ToDto() dto.Channel {
@@ -22,4 +24,14 @@ func (m *Channel) ToDto() dto.Channel {
 		m.RelationUuid,
 		m.DeletedAt,
 	}
+}
+
+type Channels []*Channel
+
+func (m Channels) ToDto() []dto.Channel {
+	var out []dto.Channel
+	for _, item := range m {
+		out = append(out, item.ToDto())
+	}
+	return out
 }

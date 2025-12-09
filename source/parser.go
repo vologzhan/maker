@@ -15,7 +15,6 @@ const (
 
 type templateLine struct {
 	nodes    []template.Node
-	lf       *template.LineFeed
 	imports  *template.Imports
 	tplEntry *template.Template
 	next     *templateLine
@@ -42,6 +41,10 @@ func parseContent(content []byte, file *File) error {
 
 			break
 		}
+		if srcLine.value == "" {
+			file.Content = append(file.Content, &LineFeed{nil, file, 1})
+			continue
+		}
 
 		if tplLine.imports != nil && state == stateBase {
 			state = stateExpectedImport
@@ -50,11 +53,8 @@ func parseContent(content []byte, file *File) error {
 		switch state {
 		case stateBase:
 		case stateExpectedImport:
-			if srcLine.value == "" {
-				file.Content[len(file.Content)-1].(*LineFeed).Value++
-				continue
-			} else if !strings.HasPrefix(srcLine.value, "import") {
-				err := parseImports(nil, tplLine.imports, tplLine.lf, file)
+			if !strings.HasPrefix(srcLine.value, "import") {
+				err := parseImports(nil, tplLine.imports, file)
 				if err != nil {
 					return err
 				}
@@ -67,7 +67,7 @@ func parseContent(content []byte, file *File) error {
 			} else {
 				srcImp := strings.TrimPrefix(srcLine.value, "import")
 				srcImp = strings.TrimSpace(srcImp)
-				err := parseImports([]string{srcImp}, tplLine.imports, tplLine.lf, file)
+				err := parseImports([]string{srcImp}, tplLine.imports, file)
 				if err != nil {
 					return err
 				}
@@ -84,7 +84,7 @@ func parseContent(content []byte, file *File) error {
 				buf = append(buf, srcImp)
 				continue
 			}
-			err := parseImports(buf, tplLine.imports, tplLine.lf, file)
+			err := parseImports(buf, tplLine.imports, file)
 			if err != nil {
 				return err
 			}
@@ -104,7 +104,7 @@ func parseContent(content []byte, file *File) error {
 			continue
 		}
 		if matched {
-			file.Content = append(file.Content, append(line, &LineFeed{tplLine.lf, file, 1})...)
+			file.Content = append(file.Content, append(line, &LineFeed{nil, file, 1})...)
 			tplLine = tplLine.next
 			continue
 		}
@@ -115,21 +115,10 @@ func parseContent(content []byte, file *File) error {
 				return err
 			}
 			if matched {
-				file.Content = append(file.Content, append(line, &LineFeed{next.lf, file, 1})...)
+				file.Content = append(file.Content, append(line, &LineFeed{nil, file, 1})...)
 				tplLine = next.next
 				continue
 			}
-		}
-		if srcLine.value == "" && len(file.Content) == 0 {
-			file.Content = append(file.Content, &LineFeed{nil, file, 1})
-			continue
-		}
-		if srcLine.value == "" {
-			if srcLf, ok := file.Content[len(file.Content)-1].(*LineFeed); ok {
-				srcLf.Value++
-				continue
-			}
-			file.Content = append(file.Content, &LineFeed{nil, file, 1})
 		}
 		file.Content = append(file.Content, append(line, &LineFeed{nil, file, 1})...)
 	}
@@ -166,16 +155,18 @@ func splitTplToLines(content []template.Node) *templateLine {
 	for _, node := range content {
 		switch n := node.(type) {
 		case *template.LineFeed:
-			prev = newTemplateLine(buf, n, prev, imps, nil)
-			buf = nil
-			imps = nil
+			if len(buf) > 0 || imps != nil {
+				prev = newTemplateLine(buf, prev, imps, nil)
+				buf = nil
+				imps = nil
+			}
 			continue
 		case *template.Imports:
 			imps = n
 			continue
 		case *template.Template:
 			if n.Entry {
-				prev = newTemplateLine(n.Items, nil, prev, nil, n)
+				prev = newTemplateLine(n.Items, prev, nil, n)
 				continue
 			}
 		}
@@ -184,24 +175,24 @@ func splitTplToLines(content []template.Node) *templateLine {
 	}
 
 	if len(buf) > 0 || imps != nil {
-		prev = newTemplateLine(buf, nil, prev, imps, nil)
+		prev = newTemplateLine(buf, prev, imps, nil)
 	}
 
 	return zeroLine.next
 }
 
-func newTemplateLine(nodes []template.Node, lf *template.LineFeed, prev *templateLine, imps *template.Imports, tplEntry *template.Template) *templateLine {
-	tplLine := &templateLine{nodes, lf, imps, tplEntry, nil}
+func newTemplateLine(nodes []template.Node, prev *templateLine, imps *template.Imports, tplEntry *template.Template) *templateLine {
+	tplLine := &templateLine{nodes, imps, tplEntry, nil}
 	if prev != nil {
 		prev.next = tplLine
 	}
 	return tplLine
 }
 
-func parseImports(imps []string, tpl *template.Imports, tplLf *template.LineFeed, f *File) error {
+func parseImports(imps []string, tpl *template.Imports, f *File) error {
 	srcImps := &Imports{tpl, f, nil}
 	f.Content = append(f.Content, srcImps)
-	f.Content = append(f.Content, &LineFeed{tplLf, f, 1})
+	f.Content = append(f.Content, &LineFeed{nil, f, 1})
 
 	for i := range imps {
 		imps[i] = strings.Replace(imps[i], "\"", "", 2)

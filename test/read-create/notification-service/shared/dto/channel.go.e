@@ -10,4 +10,6 @@ type Channel struct {
 	Uuid         uuid.UUID
 	RelationUuid uuid.UUID
 	DeletedAt    *time.Time
+
+	// maker:keep-dto-relations
 }

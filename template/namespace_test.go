@@ -38,7 +38,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, 6, len(entity.Entrypoints))
 	assert.Equal(t, 1, len(entity.Keys))
 	assert.Equal(t, 4, len(entity.Paths))
-	require.Equal(t, 1, len(entity.Children))
+	require.Equal(t, 2, len(entity.Children))
 
 	attribute := entity.Children["attribute"]
 	assert.Equal(t, "attribute", attribute.Name)
@@ -46,4 +46,12 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, 1, len(attribute.Keys))
 	assert.Equal(t, 2, len(attribute.Paths))
 	assert.Equal(t, 0, len(attribute.Children))
+
+	relation := entity.Children["relation"]
+	assert.Equal(t, "relation", relation.Name)
+	assert.Equal(t, 2, len(relation.Entrypoints))
+	assert.Equal(t, 1, len(relation.Keys))
+	assert.Equal(t, 2, len(relation.Paths))
+	assert.Equal(t, 0, len(relation.Children))
+
 }

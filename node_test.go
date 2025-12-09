@@ -28,8 +28,9 @@ func TestCreate(t *testing.T) {
 		"down": "DROP TABLE channel;",
 	})
 	entity := service.mustCreateChild(t, "entity", uuid.New(), map[string]string{
-		"name":    "channel",
-		"name_db": "channel",
+		"name":        "channel",
+		"name_db":     "channel",
+		"plural_name": "channels",
 	})
 	_ = entity.mustCreateChild(t, "attribute", uuid.New(), map[string]string{
 		"name":        "uuid",
