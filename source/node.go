@@ -3,7 +3,7 @@ package source
 import (
 	"errors"
 	"fmt"
-	slicesHelper "github.com/vologzhan/maker/helper/slices"
+	slicesHelper "github.com/vologzhan/maker-common/slices"
 	"github.com/vologzhan/maker/template"
 	"slices"
 )

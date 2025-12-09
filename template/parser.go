@@ -2,7 +2,7 @@ package template
 
 import (
 	"fmt"
-	"github.com/vologzhan/maker/helper/strcase"
+	"github.com/vologzhan/maker-common/strcase"
 	"github.com/vologzhan/maker/template/lexer"
 	"io/fs"
 	"path/filepath"

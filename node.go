@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/vologzhan/maker/helper/slices"
-	"github.com/vologzhan/maker/helper/strcase"
+	"github.com/vologzhan/maker-common/slices"
+	"github.com/vologzhan/maker-common/strcase"
 	"github.com/vologzhan/maker/source"
 	"github.com/vologzhan/maker/template"
 )

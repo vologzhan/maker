@@ -3,7 +3,7 @@ package source
 import (
 	"errors"
 	"fmt"
-	slicesHelper "github.com/vologzhan/maker/helper/slices"
+	slicesCommon "github.com/vologzhan/maker-common/slices"
 	"github.com/vologzhan/maker/template"
 	"go/format"
 	"golang.org/x/tools/imports"
@@ -233,7 +233,7 @@ func deleteDir(node *Dir) error {
 	if err != nil {
 		return err
 	}
-	node.Parent.Items = slicesHelper.Delete(node.Parent.Items, Fs(node))
+	node.Parent.Items = slicesCommon.Delete(node.Parent.Items, Fs(node))
 
 	return nil
 }
@@ -248,7 +248,7 @@ func deleteFile(node *File) error {
 	if err != nil {
 		return err
 	}
-	node.Parent.Items = slicesHelper.Delete(node.Parent.Items, Fs(node))
+	node.Parent.Items = slicesCommon.Delete(node.Parent.Items, Fs(node))
 
 	return nil
 }
