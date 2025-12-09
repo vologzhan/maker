@@ -56,11 +56,11 @@ func TestCreate(t *testing.T) {
 	})
 	root.mustFlush(t)
 
-	compareDirectory("_test/full-service", tmpDir, "", t)
+	compareDirectory("_test/_full-service", tmpDir, "", t)
 }
 
 func TestRead(t *testing.T) {
-	sourceDir := "_test/full-service"
+	sourceDir := "_test/_full-service"
 
 	root := newTestMaker(t, sourceDir)
 	require.Equal(t, 1, len(root.entrypoints))
@@ -143,7 +143,7 @@ func TestReadWithNextKeyPath(t *testing.T) {
 }
 
 func TestEdit(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "_test/full-service")
+	tmpDir := mustCopyToTmp(t, "_test/_full-service")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
@@ -171,31 +171,31 @@ func TestEdit(t *testing.T) {
 
 	service.mustFlush(t)
 
-	compareDirectory("_test/edit-after", tmpDir, "", t)
+	compareDirectory("_test/edit", tmpDir, "", t)
 }
 
-func TestCreateAttribute(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "_test/create-attribute/before")
+func TestCreateFkAttribute(t *testing.T) {
+	tmpDir := mustCopyToTmp(t, "_test/_short-service")
 	defer os.RemoveAll(tmpDir)
 
 	newTestMaker(t, tmpDir).
 		mustChildren(t, "service")[0].
 		mustChildren(t, "entity")[1].
 		mustCreateChild(t, "attribute", uuid.New(), map[string]string{
-			"name":     "employer_id",
+			"name":     "another_id",
 			"type_go":  "int",
-			"name_db":  "employer_id",
+			"name_db":  "another_id",
 			"type_db":  "int",
-			"fk_table": "employers",
+			"fk_table": "another",
 			"fk_type":  "one-to-one",
 		}).
 		mustFlush(t)
 
-	compareDirectory("_test/create-attribute/after", tmpDir, "", t)
+	compareDirectory("_test/create-fk-attribute", tmpDir, "", t)
 }
 
 func TestCreateEntityAfterFlushService(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "_test/create-entity-after-flush-service/before")
+	tmpDir := mustCopyToTmp(t, "_test/_short-service")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
@@ -204,24 +204,26 @@ func TestCreateEntityAfterFlushService(t *testing.T) {
 	service.mustFlush(t)
 
 	newEntity := service.mustCreateChild(t, "entity", uuid.New(), map[string]string{
-		"name":    "table",
-		"name_db": "table",
+		"name":        "table",
+		"name_db":     "table",
+		"plural_name": "tables",
 	})
 	newEntity.mustFlush(t)
 
-	compareDirectory("_test/create-entity-after-flush-service/after", tmpDir, "", t)
+	compareDirectory("_test/create-entity-after-flush-service", tmpDir, "", t)
 }
 
 func TestCreateEntityAndThenCreateAttributeInAnotherEntity(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "_test/create-entity-and-then-create-attribute-in-another-entity/before")
+	tmpDir := mustCopyToTmp(t, "_test/_short-service")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
 
 	service := root.mustChildren(t, "service")[0]
 	_ = service.mustCreateChild(t, "entity", uuid.New(), map[string]string{
-		"name":    "ho",
-		"name_db": "ho",
+		"name":        "table",
+		"name_db":     "table",
+		"plural_name": "tables",
 	})
 
 	entity := service.mustChildren(t, "entity")[0]
@@ -234,11 +236,11 @@ func TestCreateEntityAndThenCreateAttributeInAnotherEntity(t *testing.T) {
 
 	service.mustFlush(t)
 
-	compareDirectory("_test/create-entity-and-then-create-attribute-in-another-entity/after", tmpDir, "", t)
+	compareDirectory("_test/create-entity-and-then-create-attribute-in-another-entity", tmpDir, "", t)
 }
 
 func TestDeleteEntity(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "_test/delete/before")
+	tmpDir := mustCopyToTmp(t, "_test/_short-service")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
@@ -249,11 +251,11 @@ func TestDeleteEntity(t *testing.T) {
 
 	assert.Equal(t, 1, len(service.mustChildren(t, "entity")))
 
-	compareDirectory("_test/delete/after-entity", tmpDir, "", t)
+	compareDirectory("_test/delete-entity", tmpDir, "", t)
 }
 
 func TestDeleteAttribute(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "_test/delete/before")
+	tmpDir := mustCopyToTmp(t, "_test/_short-service")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
@@ -266,9 +268,9 @@ func TestDeleteAttribute(t *testing.T) {
 
 	attributes := entity.mustChildren(t, "attribute")
 
-	assert.Equal(t, 1, len(attributes))
+	assert.Equal(t, 2, len(attributes))
 
-	compareDirectory("_test/delete/after-attribute", tmpDir, "", t)
+	compareDirectory("_test/delete-attribute", tmpDir, "", t)
 }
 
 func TestUnableToDeleteRootNode(t *testing.T) {
@@ -347,7 +349,7 @@ func compareDirectory(expected, actual, relativePath string, t *testing.T) {
 func newTestMaker(t *testing.T, srcDir string) *Node {
 	source.Test = true
 
-	tplDir := os.DirFS("_test/template-go")
+	tplDir := os.DirFS("_test/_template-go")
 	tpl, err := template.New(tplDir, "")
 	require.NoError(t, err)
 
