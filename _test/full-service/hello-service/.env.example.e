@@ -1,0 +1,6 @@
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=hello-service
+POSTGRES_PASSWORD=hello-service
+POSTGRES_DATABASE=hello-service
+MIGRATIONS_DIR=./migrations

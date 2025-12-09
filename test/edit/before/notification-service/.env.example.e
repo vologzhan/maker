@@ -1,6 +1,0 @@
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_USER=notification-service
-POSTGRES_PASSWORD=notification-service
-POSTGRES_DATABASE=notification-service
-MIGRATIONS_DIR=./migrations

@@ -1,6 +1,0 @@
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_USER=calendar-service
-POSTGRES_PASSWORD=calendar-service
-POSTGRES_DATABASE=calendar-service
-MIGRATIONS_DIR=./migrations

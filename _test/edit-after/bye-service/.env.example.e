@@ -1,0 +1,6 @@
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=bye-service
+POSTGRES_PASSWORD=bye-service
+POSTGRES_DATABASE=bye-service
+MIGRATIONS_DIR=./migrations

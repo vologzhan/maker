@@ -20,49 +20,47 @@ func TestCreate(t *testing.T) {
 
 	root := newTestMaker(t, tmpDir)
 	service := root.mustCreateChild(t, "service", uuid.New(), map[string]string{
-		"name": "notification",
+		"name": "hello",
 	})
 	_ = service.mustCreateChild(t, "sql", uuid.New(), map[string]string{
 		"name": "20240109_init",
-		"up":   "CREATE TABLE channel;",
-		"down": "DROP TABLE channel;",
+		"up":   `CREATE TABLE "user"();`,
+		"down": `DROP TABLE "user";`,
 	})
 	entity := service.mustCreateChild(t, "entity", uuid.New(), map[string]string{
-		"name":        "channel",
-		"name_db":     "channel",
-		"plural_name": "channels",
+		"name":        "user",
+		"name_db":     "user",
+		"plural_name": "users",
 	})
 	_ = entity.mustCreateChild(t, "attribute", uuid.New(), map[string]string{
-		"name":        "uuid",
-		"type_go":     "uuid.UUID",
-		"name_db":     "uuid",
+		"name":        "id",
+		"type_go":     "int",
+		"name_db":     "id",
 		"primary_key": "1",
-		"type_db":     "uuid",
-		"default":     "uuid_generate_v4()",
+		"type_db":     "serial",
 	})
 	_ = entity.mustCreateChild(t, "attribute", uuid.New(), map[string]string{
-		"name":     "relation_uuid",
-		"type_go":  "uuid.UUID",
-		"name_db":  "relation_uuid",
-		"type_db":  "uuid",
-		"fk_table": "foreign_table",
-		"fk_type":  "one-to-one",
+		"name":    "created_at",
+		"type_go": "time.Time",
+		"name_db": "created_at",
+		"type_db": "timestamp(0)",
+		"default": "now()",
 	})
 	_ = entity.mustCreateChild(t, "attribute", uuid.New(), map[string]string{
 		"name":     "DeletedAt",
-		"nullable": "1",
 		"type_go":  "time.Time",
 		"name_db":  "deleted_at",
 		"type_db":  "timestamp(0)",
+		"nullable": "1",
 		"default":  "null",
 	})
 	root.mustFlush(t)
 
-	compareDirectory("./test/read-create", tmpDir, "", t)
+	compareDirectory("_test/full-service", tmpDir, "", t)
 }
 
 func TestRead(t *testing.T) {
-	sourceDir := "test/read-create"
+	sourceDir := "_test/full-service"
 
 	root := newTestMaker(t, sourceDir)
 	require.Equal(t, 1, len(root.entrypoints))
@@ -77,17 +75,18 @@ func TestRead(t *testing.T) {
 	service := services[0]
 	assert.Equal(t, 1, len(service.values))
 	assert.Equal(t, map[string]string{
-		"name": "notification",
+		"name": "hello",
 	}, service.values)
 
 	entities := service.mustChildren(t, "entity")
 	require.Equal(t, 1, len(entities))
 
 	entity := entities[0]
-	assert.Equal(t, 2, len(entity.values))
+	assert.Equal(t, 3, len(entity.values))
 	assert.Equal(t, map[string]string{
-		"name":    "channel",
-		"name_db": "channel",
+		"name":        "user",
+		"name_db":     "user",
+		"plural_name": "Users",
 	}, entity.values)
 
 	attributes := entity.mustChildren(t, "attribute")
@@ -95,28 +94,28 @@ func TestRead(t *testing.T) {
 
 	assert.Equal(t, 9, len(attributes[0].values))
 	assert.Equal(t, map[string]string{
-		"name":        "Uuid",
+		"name":        "Id",
 		"nullable":    "",
-		"type_go":     "uuid.UUID",
-		"name_db":     "uuid",
+		"type_go":     "int",
+		"name_db":     "id",
 		"primary_key": "1",
-		"type_db":     "uuid",
-		"default":     "uuid_generate_v4()",
+		"type_db":     "serial",
+		"default":     "",
 		"fk_table":    "",
 		"fk_type":     "",
 	}, attributes[0].values)
 
 	assert.Equal(t, 9, len(attributes[1].values))
 	assert.Equal(t, map[string]string{
-		"name":        "RelationUuid",
+		"name":        "CreatedAt",
 		"nullable":    "",
-		"type_go":     "uuid.UUID",
-		"name_db":     "relation_uuid",
+		"type_go":     "time.Time",
+		"name_db":     "created_at",
 		"primary_key": "",
-		"type_db":     "uuid",
-		"default":     "",
-		"fk_table":    "foreign_table",
-		"fk_type":     "one-to-one",
+		"type_db":     "timestamp(0)",
+		"default":     "now()",
+		"fk_table":    "",
+		"fk_type":     "",
 	}, attributes[1].values)
 
 	assert.Equal(t, 9, len(attributes[2].values))
@@ -134,7 +133,7 @@ func TestRead(t *testing.T) {
 }
 
 func TestReadWithNextKeyPath(t *testing.T) {
-	root := newTestMaker(t, "test/read-with-next-key-path")
+	root := newTestMaker(t, "_test/read-with-next-key-path")
 	services := root.mustChildren(t, "service")
 
 	assert.Equal(t, 1, len(services))
@@ -144,20 +143,21 @@ func TestReadWithNextKeyPath(t *testing.T) {
 }
 
 func TestEdit(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "./test/edit/before")
+	tmpDir := mustCopyToTmp(t, "_test/full-service")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
 
 	service := root.mustChildren(t, "service")[0]
 	service.mustSetValues(t, map[string]string{
-		"name": "calendar",
+		"name": "bye",
 	})
 
 	entity := service.mustChildren(t, "entity")[0]
 	entity.mustSetValues(t, map[string]string{
-		"name":    "only_uuid",
-		"name_db": "only_uuid",
+		"name":        "profile",
+		"name_db":     "profile",
+		"plural_name": "profiles",
 	})
 
 	attribute := entity.mustChildren(t, "attribute")[0]
@@ -171,11 +171,11 @@ func TestEdit(t *testing.T) {
 
 	service.mustFlush(t)
 
-	compareDirectory("./test/edit/after", tmpDir, "", t)
+	compareDirectory("_test/edit-after", tmpDir, "", t)
 }
 
 func TestCreateAttribute(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "./test/create-attribute/before")
+	tmpDir := mustCopyToTmp(t, "_test/create-attribute/before")
 	defer os.RemoveAll(tmpDir)
 
 	newTestMaker(t, tmpDir).
@@ -191,11 +191,11 @@ func TestCreateAttribute(t *testing.T) {
 		}).
 		mustFlush(t)
 
-	compareDirectory("./test/create-attribute/after", tmpDir, "", t)
+	compareDirectory("_test/create-attribute/after", tmpDir, "", t)
 }
 
 func TestCreateEntityAfterFlushService(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "./test/create-entity-after-flush-service/before")
+	tmpDir := mustCopyToTmp(t, "_test/create-entity-after-flush-service/before")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
@@ -209,11 +209,11 @@ func TestCreateEntityAfterFlushService(t *testing.T) {
 	})
 	newEntity.mustFlush(t)
 
-	compareDirectory("./test/create-entity-after-flush-service/after", tmpDir, "", t)
+	compareDirectory("_test/create-entity-after-flush-service/after", tmpDir, "", t)
 }
 
 func TestCreateEntityAndThenCreateAttributeInAnotherEntity(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "./test/create-entity-and-then-create-attribute-in-another-entity/before")
+	tmpDir := mustCopyToTmp(t, "_test/create-entity-and-then-create-attribute-in-another-entity/before")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
@@ -234,11 +234,11 @@ func TestCreateEntityAndThenCreateAttributeInAnotherEntity(t *testing.T) {
 
 	service.mustFlush(t)
 
-	compareDirectory("./test/create-entity-and-then-create-attribute-in-another-entity/after", tmpDir, "", t)
+	compareDirectory("_test/create-entity-and-then-create-attribute-in-another-entity/after", tmpDir, "", t)
 }
 
 func TestDeleteEntity(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "./test/delete/before")
+	tmpDir := mustCopyToTmp(t, "_test/delete/before")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
@@ -249,11 +249,11 @@ func TestDeleteEntity(t *testing.T) {
 
 	assert.Equal(t, 1, len(service.mustChildren(t, "entity")))
 
-	compareDirectory("./test/delete/after-entity", tmpDir, "", t)
+	compareDirectory("_test/delete/after-entity", tmpDir, "", t)
 }
 
 func TestDeleteAttribute(t *testing.T) {
-	tmpDir := mustCopyToTmp(t, "./test/delete/before")
+	tmpDir := mustCopyToTmp(t, "_test/delete/before")
 	defer os.RemoveAll(tmpDir)
 
 	root := newTestMaker(t, tmpDir)
@@ -268,7 +268,7 @@ func TestDeleteAttribute(t *testing.T) {
 
 	assert.Equal(t, 1, len(attributes))
 
-	compareDirectory("./test/delete/after-attribute", tmpDir, "", t)
+	compareDirectory("_test/delete/after-attribute", tmpDir, "", t)
 }
 
 func TestUnableToDeleteRootNode(t *testing.T) {
@@ -347,7 +347,7 @@ func compareDirectory(expected, actual, relativePath string, t *testing.T) {
 func newTestMaker(t *testing.T, srcDir string) *Node {
 	source.Test = true
 
-	tplDir := os.DirFS("test/template-go")
+	tplDir := os.DirFS("_test/template-go")
 	tpl, err := template.New(tplDir, "")
 	require.NoError(t, err)
 
