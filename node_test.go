@@ -28,7 +28,7 @@ func TestCreate(t *testing.T) {
 		"down": "DROP TABLE channel;",
 	})
 	entity := service.mustCreateChild(t, "entity", uuid.New(), map[string]string{
-		"name":    "Channel",
+		"name":    "channel",
 		"name_db": "channel",
 	})
 	_ = entity.mustCreateChild(t, "attribute", uuid.New(), map[string]string{
@@ -65,30 +65,34 @@ func TestRead(t *testing.T) {
 
 	root := newTestMaker(t, sourceDir)
 	require.Equal(t, 1, len(root.entrypoints))
+	assert.Equal(t, 1, len(root.values))
 	assert.Equal(t, map[string]string{
 		"path": sourceDir,
-	}, root.Values())
+	}, root.values)
 
 	services := root.mustChildren(t, "service")
 	require.Equal(t, 1, len(services))
 
 	service := services[0]
+	assert.Equal(t, 1, len(service.values))
 	assert.Equal(t, map[string]string{
 		"name": "notification",
-	}, service.Values())
+	}, service.values)
 
 	entities := service.mustChildren(t, "entity")
 	require.Equal(t, 1, len(entities))
 
 	entity := entities[0]
+	assert.Equal(t, 2, len(entity.values))
 	assert.Equal(t, map[string]string{
 		"name":    "channel",
 		"name_db": "channel",
-	}, entity.Values())
+	}, entity.values)
 
 	attributes := entity.mustChildren(t, "attribute")
 	require.Equal(t, 3, len(attributes))
 
+	assert.Equal(t, 9, len(attributes[0].values))
 	assert.Equal(t, map[string]string{
 		"name":        "Uuid",
 		"nullable":    "",
@@ -99,8 +103,9 @@ func TestRead(t *testing.T) {
 		"default":     "uuid_generate_v4()",
 		"fk_table":    "",
 		"fk_type":     "",
-	}, attributes[0].Values())
+	}, attributes[0].values)
 
+	assert.Equal(t, 9, len(attributes[1].values))
 	assert.Equal(t, map[string]string{
 		"name":        "RelationUuid",
 		"nullable":    "",
@@ -111,8 +116,9 @@ func TestRead(t *testing.T) {
 		"default":     "",
 		"fk_table":    "foreign_table",
 		"fk_type":     "one-to-one",
-	}, attributes[1].Values())
+	}, attributes[1].values)
 
+	assert.Equal(t, 9, len(attributes[2].values))
 	assert.Equal(t, map[string]string{
 		"name":        "DeletedAt",
 		"nullable":    "1",
@@ -123,7 +129,7 @@ func TestRead(t *testing.T) {
 		"default":     "null",
 		"fk_table":    "",
 		"fk_type":     "",
-	}, attributes[2].Values())
+	}, attributes[2].values)
 }
 
 func TestReadWithNextKeyPath(t *testing.T) {

@@ -125,17 +125,11 @@ func (s *strategyBase) handle(tok lexer.Token) interface{} {
 	case nil:
 		return s.buf
 	case lexer.Word:
-		s.buf = append(s.buf, &Word{
-			Value: string(token),
-		})
+		s.buf = append(s.buf, &Word{string(token), nil})
 	case lexer.LineFeed:
-		s.buf = append(s.buf, &LineFeed{
-			Value: int(token),
-		})
+		s.buf = append(s.buf, &LineFeed{int(token), nil})
 	case lexer.Separator:
-		s.buf = append(s.buf, &Separator{
-			Value: string(token),
-		})
+		s.buf = append(s.buf, &Separator{string(token), nil})
 	case lexer.TemplateStart:
 		s.child = &strategyTemplate{
 			strategyBase: strategyBase{
@@ -219,9 +213,7 @@ func (s *strategyTemplate) handle(tok lexer.Token) interface{} {
 				nil,
 			}
 		case stateSimpleTemplate:
-			return &Template{
-				Items: s.buf,
-			}
+			return &Template{s.buf, false, nil}
 		case stateInsertWithFunc:
 			if s.hasKey && len(s.buf) == 0 {
 				return &key{}
@@ -278,13 +270,9 @@ func (s *strategyTemplateEntry) handle(tok lexer.Token) interface{} {
 		if !ok {
 			panic("entry template must end with line feed")
 		}
-
 		s.lexer.GoBack(int(lf) - 1)
 
-		return &Template{
-			Items: s.buf,
-			Entry: true,
-		}
+		return &Template{s.buf, true, nil}
 	default:
 		panic(fmt.Sprintf("strategy template entry, unexpected token type: '%T'", token))
 	}
@@ -484,8 +472,8 @@ func isInsertForMerge(name string) bool {
 func splitToNamespaceNameFunction(s string) (string, string, func(string) string) {
 	parts := strings.Split(strcase.ToSnake(s), "_")
 
-	namespace := strings.Join(parts[:len(parts)-1], "_")
-	name := parts[len(parts)-1]
+	namespace := parts[0]
+	name := strings.Join(parts[1:], "_")
 
 	caseMap := map[string]func(string) string{
 		strcase.ToCamel(s):         strcase.ToCamel,

@@ -7,239 +7,268 @@ import (
 	"strings"
 )
 
-type strategyImports struct {
-	template *template.Imports
-	lineFeed *template.LineFeed
-	file     *File
-	rawLines []string
+const (
+	stateBase = iota
+	stateExpectedImport
+	stateInImport
+)
+
+type templateLine struct {
+	nodes    []template.Node
+	lf       *template.LineFeed
+	imports  *template.Imports
+	tplEntry *template.Template
+	next     *templateLine
 }
 
-type strategyEntry struct {
-	template *template.Template
-	file     *File
-	rawLines []string
+type sourceLine struct {
+	value string
+	next  *sourceLine
 }
 
 func parseContent(content []byte, file *File) error {
-	var buf []template.Node
-	rawLines := strings.Split(string(content), "\n")
+	srcLine := splitSrcToLines(content)
+	tplLine := splitTplToLines(file.Template.Content)
+	var buf []string
+	state := stateBase
 
-	var tplLines [][]template.Node
-	for _, tpl := range file.Template.Content {
-		buf = append(buf, tpl)
-
-		if _, ok := tpl.(*template.LineFeed); ok {
-			tplLines = append(tplLines, buf)
-			buf = nil
-			continue
-		}
-
-		if tplEntry, ok := tpl.(*template.Template); ok && tplEntry.Entry {
-			tplLines = append(tplLines, buf)
-			buf = nil
-		}
-	}
-
-	var strategy interface{}
-	tplPos := 0
-
-	for i, rawLine := range rawLines {
-		if tplPos >= len(tplLines) {
-			file.Content = append(file.Content, &Word{nil, file, rawLine})
-			if rawLine != "" || len(rawLines)-1 != i {
-				file.Content = append(file.Content, &LineFeed{nil, file, 1})
+	for ; srcLine != nil; srcLine = srcLine.next {
+		if tplLine == nil {
+			var tail []string
+			for ; srcLine != nil; srcLine = srcLine.next {
+				tail = append(tail, srcLine.value)
 			}
-			continue // шаблон закончился, пропуск строк
+			file.Content = append(file.Content, &Word{nil, file, strings.Join(tail, "\n")})
+
+			break
 		}
 
-		if s, ok := strategy.(*strategyImports); ok {
-			switch rawLine {
-			case "":
-			case ")":
-				imps, err := parseImports(s)
+		if tplLine.imports != nil && state == stateBase {
+			state = stateExpectedImport
+		}
+
+		switch state {
+		case stateBase:
+		case stateExpectedImport:
+			if srcLine.value == "" {
+				file.Content[len(file.Content)-1].(*LineFeed).Value++
+				continue
+			} else if !strings.HasPrefix(srcLine.value, "import") {
+				err := parseImports(nil, tplLine.imports, tplLine.lf, file)
 				if err != nil {
 					return err
 				}
-
-				file.Content = append(file.Content, imps...)
-				strategy = nil
-				tplPos++
-			default:
-				s.rawLines = append(s.rawLines, rawLine)
-			}
-
-			continue
-		}
-
-		if rawLine == "" {
-			if len(rawLines)-1 == i {
+				tplLine = tplLine.next
+				state = stateBase
 				break
+			} else if strings.HasSuffix(srcLine.value, "(") {
+				state = stateInImport
+				continue
+			} else {
+				srcImp := strings.TrimPrefix(srcLine.value, "import")
+				srcImp = strings.TrimSpace(srcImp)
+				err := parseImports([]string{srcImp}, tplLine.imports, tplLine.lf, file)
+				if err != nil {
+					return err
+				}
+				tplLine = tplLine.next
+				state = stateBase
+				continue
 			}
-			lf := file.Content[len(file.Content)-1].(*LineFeed)
-			lf.Value++
+		case stateInImport:
+			srcImp := strings.TrimSpace(srcLine.value)
+			if srcImp == "" {
+				continue
+			}
+			if srcImp != ")" {
+				buf = append(buf, srcImp)
+				continue
+			}
+			err := parseImports(buf, tplLine.imports, tplLine.lf, file)
+			if err != nil {
+				return err
+			}
+			buf = nil
+			tplLine = tplLine.next
+			state = stateBase
 			continue
 		}
 
-		tplLine, tplLf := prepareTemplateLine(tplLines[tplPos])
-
-		switch tpl := tplLine[0].(type) {
-		case *template.Template:
-			if tpl.Entry {
-				strategy = &strategyEntry{tpl, file, nil}
-
-				tplPos++
-				tplLine, tplLf = prepareTemplateLine(tplLines[tplPos])
-			}
-		case *template.Imports:
-			strategyImps := &strategyImports{tpl, tplLf, file, nil}
-
-			switch {
-			case !strings.HasPrefix(rawLine, "import"):
-				imps, err := parseImports(strategyImps)
-				if err != nil {
-					return err
-				}
-				file.Content = append(file.Content, imps...)
-
-				tplPos++
-				tplLine, tplLf = prepareTemplateLine(tplLines[tplPos])
-			case strings.HasSuffix(rawLine, "\""):
-				strategyImps.rawLines = append(strategyImps.rawLines, strings.TrimPrefix(rawLine, "import "))
-
-				imps, err := parseImports(strategyImps)
-				if err != nil {
-					return err
-				}
-				file.Content = append(file.Content, imps...)
-
-				tplPos++
-				continue
-			default:
-				strategy = strategyImps
-				continue
-			}
-		}
-
-		srcLine, matched, err := parse(rawLine, tplLine, file)
+		line, matched, err := parse(srcLine.value, tplLine.nodes, file)
 		if err != nil {
 			return err
 		}
 
-		if s, ok := strategy.(*strategyEntry); ok {
-			if !matched {
-				s.rawLines = append(s.rawLines, rawLine)
-				continue
-			}
-
-			if err := parseEntry(s); err != nil {
+		if matched && tplLine.tplEntry != nil {
+			file.Content = append(file.Content, &Template{tplLine.tplEntry, file, line})
+			continue
+		}
+		if matched {
+			file.Content = append(file.Content, append(line, &LineFeed{tplLine.lf, file, 1})...)
+			tplLine = tplLine.next
+			continue
+		}
+		if tplLine.tplEntry != nil && tplLine.next != nil {
+			next := tplLine.next
+			line, matched, err := parse(srcLine.value, next.nodes, file)
+			if err != nil {
 				return err
 			}
-			strategy = nil
+			if matched {
+				file.Content = append(file.Content, append(line, &LineFeed{next.lf, file, 1})...)
+				tplLine = next.next
+				continue
+			}
 		}
-
-		lf := &LineFeed{nil, file, 1}
-
-		if matched {
-			tplPos++
-			lf.Template = tplLf
+		if srcLine.value == "" && len(file.Content) == 0 {
+			file.Content = append(file.Content, &LineFeed{nil, file, 1})
+			continue
 		}
-
-		file.Content = append(file.Content, srcLine...)
-		file.Content = append(file.Content, lf)
+		if srcLine.value == "" {
+			if srcLf, ok := file.Content[len(file.Content)-1].(*LineFeed); ok {
+				srcLf.Value++
+				continue
+			}
+			file.Content = append(file.Content, &LineFeed{nil, file, 1})
+		}
+		file.Content = append(file.Content, append(line, &LineFeed{nil, file, 1})...)
 	}
 
 	return nil
 }
 
-func prepareTemplateLine(tplLine []template.Node) ([]template.Node, *template.LineFeed) {
-	lf, ok := tplLine[len(tplLine)-1].(*template.LineFeed)
-	if ok {
-		return tplLine[:len(tplLine)-1], lf
+func splitSrcToLines(content []byte) *sourceLine {
+	lines := strings.Split(string(content), "\n")
+
+	var first *sourceLine
+	var prev *sourceLine
+
+	for _, line := range lines {
+		cur := &sourceLine{line, nil}
+		if prev != nil {
+			prev.next = cur
+		}
+		if first == nil {
+			first = cur
+		}
+		prev = cur
 	}
 
-	return tplLine, nil
+	return first
 }
 
-func parseImports(strategy *strategyImports) ([]Stringer, error) {
-	var strImps []string
-	for _, rawLine := range strategy.rawLines {
-		preparedLine := strings.TrimSpace(rawLine)
-		preparedLine = strings.Replace(preparedLine, "\"", "", 2)
-		strImps = append(strImps, preparedLine)
+func splitTplToLines(content []template.Node) *templateLine {
+	zeroLine := &templateLine{}
+	prev := zeroLine
+	var buf []template.Node
+	var imps *template.Imports
+
+	for _, node := range content {
+		switch n := node.(type) {
+		case *template.LineFeed:
+			prev = newTemplateLine(buf, n, prev, imps, nil)
+			buf = nil
+			imps = nil
+			continue
+		case *template.Imports:
+			imps = n
+			continue
+		case *template.Template:
+			if n.Entry {
+				prev = newTemplateLine(n.Items, nil, prev, nil, n)
+				continue
+			}
+		}
+
+		buf = append(buf, node)
 	}
 
-	imps := &Imports{
-		strategy.template,
-		strategy.file,
-		nil,
+	if len(buf) > 0 || imps != nil {
+		prev = newTemplateLine(buf, nil, prev, imps, nil)
 	}
 
-	tplImps := getSortedTplImports(strategy.template)
+	return zeroLine.next
+}
 
-	for _, strImp := range strImps {
-		nameAndAlias := strings.Split(strImp, " ")
+func newTemplateLine(nodes []template.Node, lf *template.LineFeed, prev *templateLine, imps *template.Imports, tplEntry *template.Template) *templateLine {
+	tplLine := &templateLine{nodes, lf, imps, tplEntry, nil}
+	if prev != nil {
+		prev.next = tplLine
+	}
+	return tplLine
+}
 
-		var strName string
-		var strAlias string
+func parseImports(imps []string, tpl *template.Imports, tplLf *template.LineFeed, f *File) error {
+	srcImps := &Imports{tpl, f, nil}
+	f.Content = append(f.Content, srcImps)
+	f.Content = append(f.Content, &LineFeed{tplLf, f, 1})
+
+	for i := range imps {
+		imps[i] = strings.Replace(imps[i], "\"", "", 2)
+	}
+
+	tplImps := getSortedTplImports(tpl)
+
+	for _, imp := range imps {
+		nameAndAlias := strings.Split(imp, " ")
+
+		var name string
+		var alias string
 		if len(nameAndAlias) == 2 {
-			strName = nameAndAlias[1]
-			strAlias = nameAndAlias[0]
+			name = nameAndAlias[1]
+			alias = nameAndAlias[0]
 		} else {
-			strName = nameAndAlias[0]
+			name = nameAndAlias[0]
 		}
 
-		imp := &Import{
-			nil,
-			imps,
-			nil,
-			nil,
-		}
+		srcImp := &Import{nil, srcImps, nil, nil}
+		srcImps.Items = append(srcImps.Items, srcImp)
 
 		for i, tplImp := range tplImps {
-			name, matched, err := parse(strName, tplImp.Name, imp)
+			srcName, matched, err := parse(name, tplImp.Name, srcImp)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if !matched {
 				continue
 			}
 
-			imp.Template = tplImp
-			imp.Name = name
+			srcImp.Template = tplImp
+			srcImp.Name = srcName
 
 			if !tplImp.Entry {
 				tplImps = append(tplImps[:i], tplImps[i+1:]...)
 			}
 
-			if len(strAlias) > 0 {
-				imp.Alias = mustParse(strAlias, tplImp.Alias, imp)
+			if len(alias) > 0 {
+				srcAlias, _, err := parse(alias, tplImp.Alias, srcImp)
+				if err != nil {
+					return err
+				}
+				srcImp.Alias = srcAlias
 			}
 
 			break
 		}
 
-		if len(imp.Name) == 0 {
-			imp.Name = []Stringer{
-				&Word{nil, imp, strName},
-			}
-
-			if len(strAlias) > 0 {
-				imp.Alias = []Stringer{
-					&Word{nil, imp, strAlias},
-				}
-			}
+		if len(srcImp.Name) > 0 {
+			continue
 		}
 
-		imps.Items = append(imps.Items, imp)
+		srcImp.Name = []Stringer{
+			&Word{nil, srcImp, name},
+		}
+
+		if len(alias) == 0 {
+			continue
+		}
+
+		srcImp.Alias = []Stringer{
+			&Word{nil, srcImp, alias},
+		}
 	}
 
-	lf := &LineFeed{
-		Template: strategy.lineFeed,
-		Parent:   strategy.file,
-		Value:    1,
-	}
-
-	return []Stringer{imps, lf}, nil
+	return nil
 }
 
 func getSortedTplImports(imps *template.Imports) []*template.Import {
@@ -249,7 +278,8 @@ func getSortedTplImports(imps *template.Imports) []*template.Import {
 	for _, imp := range imps.Items {
 		hasInsert := false
 		for _, nameNode := range imp.Name {
-			if _, hasInsert = nameNode.(*template.Insert); hasInsert {
+			_, hasInsert = nameNode.(*template.Insert)
+			if hasInsert {
 				break
 			}
 		}
@@ -262,19 +292,6 @@ func getSortedTplImports(imps *template.Imports) []*template.Import {
 	}
 
 	return append(head, tail...)
-}
-
-func parseEntry(strategy *strategyEntry) error {
-	for _, rawLine := range strategy.rawLines {
-		src, _, err := parse(rawLine, []template.Node{strategy.template}, strategy.file)
-		if err != nil {
-			return err
-		}
-
-		strategy.file.Content = append(strategy.file.Content, src...)
-	}
-
-	return nil
 }
 
 func mustParse(str string, tplNodes []template.Node, parent Node) []Stringer {
@@ -422,11 +439,8 @@ func stringToNode(match []string, matchPos *int, tpl template.Node, parent Node)
 		}
 		return out
 	case *template.Template:
-		out := &Template{
-			Template: tpl,
-			Parent:   parent,
-			Items:    nil,
-		}
+		out := &Template{tpl, parent, nil}
+
 		*matchPos++
 		for _, tpl := range tpl.Items {
 			out.Items = append(out.Items, stringToNode(match, matchPos, tpl, out))

@@ -2,6 +2,7 @@ package source
 
 import (
 	"errors"
+	"fmt"
 	slicesHelper "github.com/vologzhan/maker/helper/slices"
 	"github.com/vologzhan/maker/template"
 	"go/format"
@@ -68,38 +69,38 @@ func SaveRecursive(node Node) error {
 }
 
 func saveRecursive(node Fs) error {
-	switch node := node.(type) {
+	switch n := node.(type) {
 	case *Dir:
-		if node.Status == FsStatusDeleted {
-			return deleteDir(node)
+		if n.Status == FsStatusDeleted {
+			return deleteDir(n)
 		}
-		if node.Status == FsStatusNew {
-			if err := createDir(node); err != nil {
+		if n.Status == FsStatusNew {
+			if err := createDir(n); err != nil {
 				return err
 			}
 		}
-		if node.Status == FsStatusChanged {
-			if err := rename(node); err != nil {
+		if n.Status == FsStatusChanged {
+			if err := rename(n); err != nil {
 				return err
 			}
 		}
 
-		for i := len(node.Items) - 1; i >= 0; i-- {
-			if err := saveRecursive(node.Items[i]); err != nil {
+		for i := len(n.Items) - 1; i >= 0; i-- {
+			if err := saveRecursive(n.Items[i]); err != nil {
 				return err
 			}
 		}
 	case *File:
-		if node.Status == FsStatusDeleted {
-			return deleteFile(node)
+		if n.Status == FsStatusDeleted {
+			return deleteFile(n)
 		}
-		if node.Status == FsStatusNew {
-			if err := createFile(node); err != nil {
+		if n.Status == FsStatusNew {
+			if err := createFile(n); err != nil {
 				return err
 			}
 		}
-		if node.Status == FsStatusChanged {
-			if err := updateFile(node); err != nil {
+		if n.Status == FsStatusChanged {
+			if err := updateFile(n); err != nil {
 				return err
 			}
 		}
@@ -288,7 +289,7 @@ func buildContent(f *File) ([]byte, error) {
 	case template.FileGo:
 		formatedContent, err := format.Source(content)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("source: buildContent: format source error: [%w], file: [%s], content:\n%s", err, f.GetName(), content)
 		}
 
 		//imports.LocalPrefix = "" // todo
