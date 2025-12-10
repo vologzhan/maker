@@ -14,36 +14,55 @@ func New(tpl *template.Dir, path string) *Dir {
 }
 
 func CreateEntry(tpl template.Node, parent Node) (Node, error) {
-	node := createNodeRecursive(tpl, parent, false)
+	entry := createNodeRecursive(tpl, parent, false)
 
+	err := addEntryToParent(entry, parent)
+	if err != nil {
+		return nil, err
+	}
+
+	return entry, nil
+}
+
+func addEntryToParent(child, parent Node) error {
 	switch parent := parent.(type) {
 	case nil:
 		// nothing
 	case *Dir:
-		parent.Items = append(parent.Items, node.(Fs))
+		parent.Items = append(parent.Items, child.(Fs))
+	case *Imports:
+		parent.Items = append(parent.Items, child.(*Import))
 	case *File:
-		var prevTpl template.Node
+		tpl := child.GetTemplate()
+
+		var tplPrev template.Node
 		for _, n := range parent.Template.Content {
 			if n == tpl {
 				break
 			}
-			prevTpl = n
+			if _, ok := n.(*template.LineFeed); !ok {
+				tplPrev = n
+			}
 		}
 
 		for i := len(parent.Content) - 1; i >= 0; i-- {
-			parentTpl := parent.Content[i].GetTemplate()
-			if parentTpl == tpl || parentTpl == prevTpl {
-				parent.Content = slices.Insert(parent.Content, i+1, node.(Stringer))
-				break
+			currentTpl := parent.Content[i].GetTemplate()
+			if currentTpl == tpl {
+				parent.Content = slices.Insert(parent.Content, i+1, child.(Stringer))
+				return nil
+			}
+			if currentTpl == tplPrev {
+				parent.Content = slices.Insert(parent.Content, i+2, child.(Stringer)) // вставка после перевода строки
+				return nil
 			}
 		}
-	case *Imports:
-		parent.Items = append(parent.Items, node.(*Import))
+
+		return fmt.Errorf("source: addEntryToParent: in file no found place to insert node")
 	default:
-		return nil, fmt.Errorf("source: CreateEntry: unexpected parent node type '%T'", parent)
+		return fmt.Errorf("source: addEntryToParent: unexpected parent node type '%T'", parent)
 	}
 
-	return node, nil
+	return nil
 }
 
 func createNodeRecursive(tpl template.Node, parent Node, skipEntry bool) Node {
